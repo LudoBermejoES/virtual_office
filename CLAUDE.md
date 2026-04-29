@@ -52,7 +52,9 @@ Cada `#### Scenario:` de un spec produce **un test** que se escribe **antes** de
 2. Escribe el test (red)
 3. Implementa lo mínimo para verlo green
 4. Refactoriza sin tocar el test
-5. Marca [x] en tasks.md y pasa al siguiente Scenario
+5. Ejecuta `pnpm lint && pnpm format:check` — corrige antes de continuar
+6. Confirma que los tests siguen en verde
+7. Marca [x] en tasks.md y pasa al siguiente Scenario
 ```
 
 Aplica a unit, integration y e2e por igual. La pirámide y los helpers de fixtures viven en [`doc/tests/README.md`](doc/tests/README.md).
@@ -111,6 +113,7 @@ openspec validate --all --strict
 # Una vez exista código:
 pnpm typecheck
 pnpm lint
+pnpm format:check
 pnpm test                  # vitest unit + integration
 pnpm e2e:chromium          # playwright
 ```

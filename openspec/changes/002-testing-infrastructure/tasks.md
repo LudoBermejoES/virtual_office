@@ -52,7 +52,9 @@
 
 ## 7. Verificación
 
-- [ ] 7.1 `pnpm --filter backend test` pasa con coverage ≥ 80%.
-- [ ] 7.2 `pnpm --filter frontend test` pasa.
-- [ ] 7.3 `pnpm --filter frontend e2e:chromium` pasa.
-- [ ] 7.4 Trace de Playwright generado en `test-results/` cuando un test falla a propósito.
+- [ ] 7.1 `pnpm lint` en verde sin errores.
+- [ ] 7.2 `pnpm format:check` en verde sin diferencias.
+- [ ] 7.3 `pnpm --filter backend test` pasa con coverage ≥ 80%.
+- [ ] 7.4 `pnpm --filter frontend test` pasa.
+- [ ] 7.5 `pnpm --filter frontend e2e:chromium` pasa.
+- [ ] 7.6 Trace de Playwright generado en `test-results/` cuando un test falla a propósito.
