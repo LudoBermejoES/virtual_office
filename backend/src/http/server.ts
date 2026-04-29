@@ -14,17 +14,13 @@ export async function buildServer(db: DatabaseSync) {
 
   await app.register(healthRoutes, { db });
 
-  app.addContentTypeParser(
-    "application/json",
-    { parseAs: "string" },
-    (_, body, done) => {
-      try {
-        done(null, JSON.parse(body as string));
-      } catch (err) {
-        done(err as Error, undefined);
-      }
-    },
-  );
+  app.addContentTypeParser("application/json", { parseAs: "string" }, (_, body, done) => {
+    try {
+      done(null, JSON.parse(body as string));
+    } catch (err) {
+      done(err as Error, undefined);
+    }
+  });
 
   return app;
 }

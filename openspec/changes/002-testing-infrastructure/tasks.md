@@ -1,5 +1,14 @@
 # Tareas: Testing Infrastructure
 
+## 0. ESLint + Prettier
+
+- [x] 0.1 Añadir dependencias dev en raíz: `eslint`, `@typescript-eslint/eslint-plugin`, `@typescript-eslint/parser`, `eslint-config-prettier`, `prettier`.
+- [x] 0.2 Crear `eslint.config.mjs` raíz con reglas TS estrictas y `prettier` al final.
+- [x] 0.3 Crear `.prettierrc` raíz con config (2 spaces, singleQuote, semicolons, printWidth 100).
+- [x] 0.4 Añadir script `lint` en `package.json` raíz que linte los tres paquetes.
+- [x] 0.5 Añadir script `format` en `package.json` raíz que formatee con `prettier --write`.
+- [x] 0.6 Verificar: `pnpm lint` y `pnpm format --check` en verde sin errores.
+
 ## 1. Vitest backend
 
 - [ ] 1.1 Añadir dependencias dev: `vitest`, `@vitest/coverage-v8`, `supertest`, `@types/supertest`.

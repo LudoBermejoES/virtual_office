@@ -14,8 +14,9 @@ export function runMigrations(db: DatabaseSync): void {
   `);
 
   const applied = new Set<number>(
-    (db.prepare("SELECT version FROM _migrations ORDER BY version").all() as { version: number }[])
-      .map((r) => r.version),
+    (
+      db.prepare("SELECT version FROM _migrations ORDER BY version").all() as { version: number }[]
+    ).map((r) => r.version),
   );
 
   const files = readdirSync(migrationsDir)

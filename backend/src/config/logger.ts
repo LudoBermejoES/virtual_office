@@ -2,9 +2,7 @@ import { createLogger, format, transports } from "winston";
 import "winston-daily-rotate-file";
 import { env } from "./env.js";
 
-const logTransports: transports.StreamTransportInstance[] = [
-  new transports.Console(),
-];
+const logTransports: transports.StreamTransportInstance[] = [new transports.Console()];
 
 if (env.NODE_ENV === "production") {
   logTransports.push(
@@ -19,11 +17,7 @@ if (env.NODE_ENV === "production") {
 
 export const logger = createLogger({
   level: env.LOG_LEVEL,
-  format: format.combine(
-    format.timestamp(),
-    format.errors({ stack: true }),
-    format.json(),
-  ),
+  format: format.combine(format.timestamp(), format.errors({ stack: true }), format.json()),
   defaultMeta: { service: "virtual-office" },
   transports: logTransports,
 });

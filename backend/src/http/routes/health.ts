@@ -2,7 +2,10 @@ import type { FastifyInstance } from "fastify";
 import type { DatabaseSync } from "node:sqlite";
 import { isSentryEnabled } from "../../infra/observability/sentry.js";
 
-export async function healthRoutes(app: FastifyInstance, { db }: { db: DatabaseSync }): Promise<void> {
+export async function healthRoutes(
+  app: FastifyInstance,
+  { db }: { db: DatabaseSync },
+): Promise<void> {
   app.get("/healthz", { logLevel: "silent" }, async (_request, reply) => {
     let dbStatus: "ok" | "error" = "ok";
     try {
