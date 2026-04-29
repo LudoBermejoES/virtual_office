@@ -7,7 +7,7 @@ describe("GET /healthz", () => {
   const { db, cleanup } = setupTestDb();
 
   beforeAll(async () => {
-    server = await buildServer(db);
+    server = await buildServer({ db });
     await server.ready();
   });
 

@@ -11,9 +11,8 @@
     "declarationMap": true,
     "sourceMap": true,
     "outDir": "./dist",
-    "rootDir": "./src",
     "paths": {
-      "@virtual-office/shared": ["../packages/shared/src/index.ts"]
+      "@virtual-office/shared": ["../packages/shared/dist/index.d.ts"]
     }
   },
   "include": ["src"],

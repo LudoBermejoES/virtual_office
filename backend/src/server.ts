@@ -12,7 +12,7 @@ async function main(): Promise<void> {
   runMigrations(db);
   logger.info("Migraciones aplicadas");
 
-  const server = await buildServer(db);
+  const server = await buildServer({ db });
 
   const shutdown = async (signal: string): Promise<void> => {
     logger.info(`Señal recibida: ${signal}. Cerrando servidor...`);

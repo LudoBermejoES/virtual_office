@@ -1,18 +1,35 @@
 import Fastify from "fastify";
+import cookie from "@fastify/cookie";
+import rateLimit from "@fastify/rate-limit";
 import type { DatabaseSync } from "node:sqlite";
-import { env } from "../config/env.js";
+import { env as defaultEnv } from "../config/env.js";
+import type { Env } from "../config/env.js";
 import { errorHandler } from "./plugins/error-handler.js";
+import { authGuard } from "./plugins/auth-guard.js";
 import { healthRoutes } from "./routes/health.js";
+import { authRoutes } from "./routes/auth.js";
+import type { GoogleVerifier } from "../infra/auth/google-verifier.js";
 
-export async function buildServer(db: DatabaseSync) {
+export interface ServerDeps {
+  db: DatabaseSync;
+  googleVerifier?: GoogleVerifier;
+  env?: Env;
+}
+
+export async function buildServer({ db, googleVerifier, env: envOverride }: ServerDeps) {
+  const env = envOverride ?? defaultEnv;
   const app = Fastify({
     logger: false,
     disableRequestLogging: true,
   });
 
+  await app.register(cookie);
+  await app.register(rateLimit, { max: 100, timeWindow: "1 minute" });
   await app.register(errorHandler);
 
   await app.register(healthRoutes, { db });
+  await app.register(authRoutes, { db, googleVerifier, env });
+  await app.register(authGuard, { db, env });
 
   app.addContentTypeParser("application/json", { parseAs: "string" }, (_, body, done) => {
     try {
@@ -25,4 +42,4 @@ export async function buildServer(db: DatabaseSync) {
   return app;
 }
 
-export { env };
+export { defaultEnv as env };

@@ -1,6 +1,8 @@
 import "./style.css";
 import * as Phaser from "phaser";
 import { BootScene } from "./scenes/BootScene.js";
+import { LoginScene } from "./scenes/LoginScene.js";
+import { OfficeScene } from "./scenes/OfficeScene.js";
 
 async function preloadFonts(): Promise<void> {
   await Promise.all([
@@ -27,7 +29,7 @@ async function main(): Promise<void> {
     render: {
       antialias: false,
     },
-    scene: [BootScene],
+    scene: [BootScene, LoginScene, OfficeScene],
   });
 }
 

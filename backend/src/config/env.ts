@@ -8,6 +8,7 @@ const envSchema = z.object({
   DB_PATH: z.string().default("./data/virtual-office.db"),
 
   SESSION_SECRET: z.string().min(32, "SESSION_SECRET debe tener al menos 32 caracteres"),
+  SESSION_SECRET_PREVIOUS: z.string().optional().default(""),
   SESSION_TTL_DAYS: z.coerce.number().int().positive().default(7),
 
   GOOGLE_CLIENT_ID: z.string().optional().default(""),
@@ -33,6 +34,10 @@ function loadEnv(): Env {
     process.exit(1);
   }
   return result.data;
+}
+
+export function parseEnv(raw: Record<string, string | undefined>): Env {
+  return envSchema.parse(raw);
 }
 
 export const env = loadEnv();

@@ -26,6 +26,7 @@
     "fastify-type-provider-zod": "^5.0.3",
     "google-auth-library": "^9.15.1",
     "image-size": "^2.0.1",
+    "jose": "^6.2.3",
     "winston": "^3.17.0",
     "winston-daily-rotate-file": "^5.0.0",
     "ws": "^8.18.2",

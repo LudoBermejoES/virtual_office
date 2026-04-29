@@ -4,7 +4,7 @@ import { FakeGoogleVerifier } from "../../support/google-auth-fake.js";
 describe("FakeGoogleVerifier", () => {
   it("lanza error si no se llamó a setNextPayload", async () => {
     const verifier = new FakeGoogleVerifier();
-    await expect(verifier.verifyIdToken("any-token")).rejects.toThrow(
+    await expect(verifier.verify("any-token")).rejects.toThrow(
       "el test no llamó a setNextPayload",
     );
   });
@@ -16,13 +16,14 @@ describe("FakeGoogleVerifier", () => {
       email: "alice@teimas.com",
       hd: "teimas.com",
       name: "Alice",
+      iss: "accounts.google.com",
     };
     verifier.setNextPayload(payload);
 
-    const result = await verifier.verifyIdToken("fake-token");
-    expect(result.getPayload()).toEqual(payload);
+    const result = await verifier.verify("fake-token");
+    expect(result).toEqual(payload);
 
-    await expect(verifier.verifyIdToken("another-token")).rejects.toThrow(
+    await expect(verifier.verify("another-token")).rejects.toThrow(
       "el test no llamó a setNextPayload",
     );
   });
