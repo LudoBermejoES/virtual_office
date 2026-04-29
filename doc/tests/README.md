@@ -312,6 +312,39 @@ Antes de marcar un Scenario como `[x]` en `tasks.md`:
 
 ---
 
+## Pipeline de CI (referencia)
+
+```yaml
+# .github/workflows/ci.yml — esquema orientativo
+jobs:
+  quality:
+    steps:
+      - pnpm install
+      - pnpm typecheck
+      - pnpm lint
+      - pnpm format:check
+
+  unit-integration:
+    needs: quality
+    steps:
+      - pnpm --filter backend test --coverage
+      - pnpm --filter frontend test
+
+  e2e-chromium:
+    needs: quality
+    steps:
+      - pnpm --filter frontend exec playwright install chromium
+      - pnpm --filter frontend e2e:chromium
+
+  e2e-firefox:
+    needs: quality
+    steps:
+      - pnpm --filter frontend exec playwright install firefox
+      - pnpm --filter frontend e2e:firefox
+```
+
+---
+
 ## Fuentes consultadas
 
 - [Vitest vs Jest 2026 — DevTools Research](https://devtoolswatch.com/en/vitest-vs-jest-2026)

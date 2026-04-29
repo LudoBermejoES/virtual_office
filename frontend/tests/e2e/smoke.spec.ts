@@ -1,0 +1,10 @@
+import { test, expect } from "@playwright/test";
+
+test("GET /healthz responde 200 con status ok", async ({ request }) => {
+  const res = await request.get("/healthz");
+  expect(res.status()).toBe(200);
+
+  const body = await res.json();
+  expect(body.status).toBe("ok");
+  expect(body.db).toBe("ok");
+});
