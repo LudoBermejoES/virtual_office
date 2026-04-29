@@ -1,0 +1,64 @@
+schema: spec-driven
+
+context: |
+  ## Proyecto: Teimas Space — Oficina virtual
+
+  Aplicación web para reservar puestos de oficina por día, con visualización
+  estilo videojuego del mapa de la oficina.
+
+  ## Stack
+  Backend:  Node.js 24 LTS + TypeScript + Fastify + node:sqlite (nativo)
+            ws (WebSockets) + google-auth-library + Winston + Sentry + PM2
+  Frontend: Phaser 4 + TypeScript + Vite + zustand + WebSocket nativo
+  Testing:  Vitest (unit + integration con Supertest) + Playwright (e2e)
+  Estética: tipografía pixel — Press Start 2P + VT323 (Google Fonts)
+
+  ## Conceptos del dominio
+  - Office: oficina con mapa (PNG/JPG/WebP/SVG) y dimensiones.
+  - Desk: zona poligonal sobre el mapa que representa un puesto.
+  - Booking: reserva de un desk en una fecha concreta (type=daily|fixed).
+  - User: usuario autenticado vía Google. role=admin|member.
+  - Invitation: invitación de un admin a un email externo, con token y caducidad.
+  - is_invited_external: usuarios fuera del dominio Teimas, requieren invitación
+    pero igual deben loguearse con Google.
+
+  ## Reglas transversales
+  - Login solo con Google (validación server-side del claim `hd` del ID token).
+  - Usuarios externos sin dominio Teimas requieren invitación previa de admin.
+  - Las fechas se manejan como YYYY-MM-DD literal en backend; el cliente decide
+    qué es "hoy" según su zona horaria.
+  - SQLite con WAL, foreign_keys ON, migraciones idempotentes.
+  - Logs estructurados JSON sin PII (ni emails completos ni tokens).
+  - TDD: todo Scenario tiene un test que se escribe ANTES del código.
+
+  ## Lenguaje
+  Documentación, comentarios y commits en español. Los identificadores de código
+  en inglés.
+
+  ## Convenciones de specs
+  - Dominios sugeridos: autenticacion, oficinas, puestos, reservas, realtime,
+    invitaciones, ui-game.
+  - Cada Requirement va en RFC 2119 (DEBE / DEBERÍA / PUEDE).
+  - Cada Scenario en formato GIVEN / WHEN / THEN.
+  - Incluir scenario de error y scenario de autorización cuando aplique.
+
+rules:
+  proposal:
+    - Indicar qué dominios afecta (autenticacion, oficinas, puestos, reservas, realtime, invitaciones, ui-game).
+    - Indicar el orden esperado dentro del roadmap (001..012) y dependencias previas.
+    - Incluir impacto de seguridad si toca auth o invitaciones.
+  specs:
+    - Usar GIVEN/WHEN/THEN para todos los scenarios.
+    - Incluir scenario de autorización cuando el endpoint requiere admin.
+    - Incluir scenario de error de validación cuando hay payload del cliente.
+    - Para acciones realtime, incluir scenario "otros clientes ven el cambio".
+  design:
+    - Listar las migraciones SQL necesarias.
+    - Listar los endpoints HTTP y mensajes WebSocket que se añaden o cambian.
+    - Si hay subida de archivos, especificar tamaños y MIME types permitidos.
+    - Si afecta a Phaser, indicar qué escenas se tocan y nuevos assets.
+  tasks:
+    - Cada Scenario del spec tiene asociado al menos un test TDD.
+    - Tareas separadas para: tests unit, tests integration, tests e2e cuando aplique.
+    - Tarea de migración SQL si añade tablas o columnas.
+    - Tarea de typecheck + lint en verde antes de cerrar.

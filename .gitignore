@@ -1,0 +1,134 @@
+# ──────────────────────────────────────────────────────────────────
+#  Dependencies
+# ──────────────────────────────────────────────────────────────────
+node_modules/
+.pnpm-store/
+.pnp.*
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+jspm_packages/
+
+# ──────────────────────────────────────────────────────────────────
+#  Build / dist
+# ──────────────────────────────────────────────────────────────────
+dist/
+dist-ssr/
+build/
+out/
+.next/
+.nuxt/
+.vite/
+.cache/
+*.tsbuildinfo
+backend/dist/
+frontend/dist/
+packages/*/dist/
+
+# ──────────────────────────────────────────────────────────────────
+#  Environment / secrets
+# ──────────────────────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+!.env.template
+*.pem
+*.key
+secrets/
+.secrets/
+
+# ──────────────────────────────────────────────────────────────────
+#  Runtime data (SQLite, mapas Tiled subidos, logs)
+# ──────────────────────────────────────────────────────────────────
+data/
+!data/.gitkeep
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+
+# Logs (Winston + PM2)
+logs/
+*.log
+pm2-*.log
+pm2.pid
+.pm2/
+
+# ──────────────────────────────────────────────────────────────────
+#  Tests
+# ──────────────────────────────────────────────────────────────────
+coverage/
+.nyc_output/
+.vitest-cache/
+.vitest/
+
+# Playwright
+playwright-report/
+playwright/.cache/
+test-results/
+blob-report/
+# Mantener baselines de regresión visual; ignorar solo los diffs/actuales
+**/__diff_output__/
+**/test-results/**
+
+# ──────────────────────────────────────────────────────────────────
+#  TypeScript
+# ──────────────────────────────────────────────────────────────────
+*.tsbuildinfo
+.tsbuild/
+
+# ──────────────────────────────────────────────────────────────────
+#  Editor / IDE
+# ──────────────────────────────────────────────────────────────────
+.vscode/*
+!.vscode/settings.json.example
+!.vscode/extensions.json
+.idea/
+*.iml
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+*.swo
+*~
+.history/
+
+# ──────────────────────────────────────────────────────────────────
+#  Sistema operativo
+# ──────────────────────────────────────────────────────────────────
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# ──────────────────────────────────────────────────────────────────
+#  Misc
+# ──────────────────────────────────────────────────────────────────
+*.bak
+*.tmp
+*.temp
+*.orig
+.DS_Store?
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+.eslintcache
+.stylelintcache
+
+# ──────────────────────────────────────────────────────────────────
+#  Claude Code (workspace local)
+# ──────────────────────────────────────────────────────────────────
+.claude/
