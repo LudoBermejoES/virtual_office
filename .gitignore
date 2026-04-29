@@ -129,6 +129,9 @@ lerna-debug.log*
 .stylelintcache
 
 # ──────────────────────────────────────────────────────────────────
-#  Claude Code (workspace local)
+#  Claude Code
+#  Compartimos skills, commands, agents y settings.json del equipo;
+#  ignoramos solo lo que es estrictamente personal o sensible.
 # ──────────────────────────────────────────────────────────────────
-.claude/
+.claude/settings.local.json
+.claude/.cache/
