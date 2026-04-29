@@ -105,7 +105,9 @@
       "WebFetch(domain:cloud.google.com)",
       "WebFetch(domain:github.com/Fission-AI)",
       "WebFetch(domain:fonts.google.com)",
-      "Bash(SESSION_SECRET=\"supersecretodealmenos32caracteresaqui\" pnpm --filter backend test --coverage)"
+      "Bash(SESSION_SECRET=\"supersecretodealmenos32caracteresaqui\" pnpm --filter backend test --coverage)",
+      "Bash(SESSION_SECRET=\"supersecretodealmenos32caracteresaqui\" npx vitest run tests/integration/offices.test.ts)",
+      "Bash(SESSION_SECRET=\"supersecretodealmenos32caracteresaqui\" npx vitest run tests/integration/offices.test.ts -t \"bundle válido\")"
     ],
     "deny": [
       "Read(.env)",
