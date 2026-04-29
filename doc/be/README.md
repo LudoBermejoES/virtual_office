@@ -222,7 +222,7 @@ CREATE TABLE _migrations (
 ### Reglas
 
 - **Validación server-side del `hd`**. El parámetro `hd=teimas.com` en la URL de OAuth es solo UI; siempre se valida el `hd` del payload del ID token tras `verifyIdToken`.
-- **Lista de dominios permitidos** en `env`: `TEIMAS_DOMAINS=teimas.com,teimas.es`. El usuario externo invitado no tiene `hd` que coincida; pasa por la rama "tiene invitación válida".
+- **Lista de dominios permitidos** en `env`: `TEIMAS_DOMAINS=teimas.com,teimas.es,teimassolutions.com`. El usuario externo invitado no tiene `hd` que coincida; pasa por la rama "tiene invitación válida".
 - **Cookie de sesión**: JWT firmado con HS256, secret en env, expiración 7 días, rotación silenciosa.
 - **Sin contraseñas**, sin tabla `passwords`.
 
@@ -377,7 +377,7 @@ DB_PATH=./data/teimas-space.db
 
 GOOGLE_CLIENT_ID=…
 GOOGLE_CLIENT_SECRET=…
-TEIMAS_DOMAINS=teimas.com,teimas.es
+TEIMAS_DOMAINS=teimas.com,teimas.es,teimassolutions.com
 ADMIN_EMAILS=ludo.bermejo@teimas.com
 
 SESSION_SECRET=<256 bits>

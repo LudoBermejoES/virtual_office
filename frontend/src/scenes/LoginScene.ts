@@ -108,10 +108,14 @@ export class LoginScene extends Phaser.Scene {
   }
 
   private handleCredential(idToken: string): void {
+    const inviteToken = localStorage.getItem("inviteToken") ?? undefined;
+    const body: { idToken: string; inviteToken?: string } = { idToken };
+    if (inviteToken) body.inviteToken = inviteToken;
+
     fetch(`${BASE_URL}/api/auth/google`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ idToken }),
+      body: JSON.stringify(body),
       credentials: "include",
     })
       .then(async (res) => {
@@ -120,6 +124,7 @@ export class LoginScene extends Phaser.Scene {
           this.showError(data.reason ?? "error");
           return;
         }
+        localStorage.removeItem("inviteToken");
         this.unmountOverlay();
         this.scene.start("OfficeScene");
       })
@@ -133,6 +138,8 @@ export class LoginScene extends Phaser.Scene {
       domain_not_allowed: "DOMINIO NO PERMITIDO",
       email_not_verified: "EMAIL SIN VERIFICAR",
       invalid_token: "TOKEN INVALIDO",
+      invitation_expired: "INVITACION CADUCADA",
+      invitation_already_used: "INVITACION YA UTILIZADA",
     };
     const text = messages[reason] ?? "ERROR DE AUTENTICACION";
     this.errorText?.setText(text);

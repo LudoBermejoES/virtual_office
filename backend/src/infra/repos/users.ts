@@ -22,16 +22,25 @@ export function upsertUser(
     name: string;
     avatar_url?: string | undefined;
     role: UserRole;
+    is_invited_external?: number;
   },
 ): UserRow {
   db.prepare(
-    `INSERT INTO users (google_sub, email, domain, name, avatar_url, role)
-     VALUES (?, ?, ?, ?, ?, ?)
+    `INSERT INTO users (google_sub, email, domain, name, avatar_url, role, is_invited_external)
+     VALUES (?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(google_sub) DO UPDATE SET
        email = excluded.email,
        name = excluded.name,
        avatar_url = excluded.avatar_url`,
-  ).run(data.google_sub, data.email, data.domain, data.name, data.avatar_url ?? null, data.role);
+  ).run(
+    data.google_sub,
+    data.email,
+    data.domain,
+    data.name,
+    data.avatar_url ?? null,
+    data.role,
+    data.is_invited_external ?? 0,
+  );
 
   return db
     .prepare("SELECT * FROM users WHERE google_sub = ?")

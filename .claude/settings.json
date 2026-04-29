@@ -1,5 +1,8 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "env": {
+    "OPENSPEC_TELEMETRY": "0"
+  },
   "permissions": {
     "allow": [
       "Bash(openspec --version)",
@@ -19,7 +22,6 @@
       "Bash(openspec config *)",
       "Bash(openspec schemas *)",
       "Bash(openspec schema *)",
-
       "Bash(git status*)",
       "Bash(git status)",
       "Bash(git diff*)",
@@ -38,7 +40,6 @@
       "Bash(git rev-parse *)",
       "Bash(git ls-files*)",
       "Bash(git config --get *)",
-
       "Bash(gh --version)",
       "Bash(gh auth status*)",
       "Bash(gh repo view*)",
@@ -50,7 +51,6 @@
       "Bash(gh issue view*)",
       "Bash(gh issue list*)",
       "Bash(gh api repos/*)",
-
       "Bash(pnpm --version)",
       "Bash(pnpm install*)",
       "Bash(pnpm add *)",
@@ -64,29 +64,24 @@
       "Bash(pnpm dev*)",
       "Bash(pnpm e2e*)",
       "Bash(pnpm --filter * *)",
-
       "Bash(npm --version)",
       "Bash(npm install*)",
       "Bash(npm run *)",
       "Bash(npx *)",
-
       "Bash(node --version)",
       "Bash(node -e *)",
       "Bash(node --experimental-sqlite *)",
-
       "Bash(vitest *)",
       "Bash(playwright *)",
       "Bash(tsx *)",
       "Bash(tsc *)",
       "Bash(eslint *)",
       "Bash(prettier *)",
-
       "Bash(pm2 --version)",
       "Bash(pm2 list*)",
       "Bash(pm2 status*)",
       "Bash(pm2 logs*)",
       "Bash(pm2 describe *)",
-
       "Bash(ls *)",
       "Bash(ls)",
       "Bash(find * -type f *)",
@@ -98,7 +93,6 @@
       "Bash(tail *.md)",
       "Bash(mkdir -p *)",
       "Bash(rm -rf data/test/*)",
-
       "WebFetch(domain:docs.phaser.io)",
       "WebFetch(domain:phaser.io)",
       "WebFetch(domain:doc.mapeditor.org)",
@@ -110,7 +104,8 @@
       "WebFetch(domain:developers.google.com)",
       "WebFetch(domain:cloud.google.com)",
       "WebFetch(domain:github.com/Fission-AI)",
-      "WebFetch(domain:fonts.google.com)"
+      "WebFetch(domain:fonts.google.com)",
+      "Bash(SESSION_SECRET=\"supersecretodealmenos32caracteresaqui\" pnpm --filter backend test --coverage)"
     ],
     "deny": [
       "Read(.env)",
@@ -130,8 +125,5 @@
       "Bash(curl * | bash)",
       "Bash(wget * | sh)"
     ]
-  },
-  "env": {
-    "OPENSPEC_TELEMETRY": "0"
   }
 }

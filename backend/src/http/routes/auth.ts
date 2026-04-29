@@ -1,7 +1,8 @@
 import type { FastifyInstance } from "fastify";
 import type { DatabaseSync } from "node:sqlite";
 import { z } from "zod";
-import { isAllowedDomain } from "../../domain/auth.js";
+import { checkDomain } from "../../domain/auth.js";
+import * as invRepo from "../../infra/repos/invitations.js";
 import type { GoogleVerifier } from "../../infra/auth/google-verifier.js";
 import { signJwt, verifyJwt } from "../../infra/auth/session.js";
 import { upsertUser, promoteToAdmin, findUserById } from "../../infra/repos/users.js";
@@ -34,7 +35,9 @@ export async function authRoutes(
       config: { rateLimit: { max: 10, timeWindow: "1 minute" } },
     },
     async (request, reply) => {
-      const body = z.object({ idToken: z.string() }).safeParse(request.body);
+      const body = z
+        .object({ idToken: z.string(), inviteToken: z.string().optional() })
+        .safeParse(request.body);
       if (!body.success) return reply.status(400).send({ reason: "bad_request" });
 
       let payload: Awaited<ReturnType<NonNullable<typeof googleVerifier>["verify"]>>;
@@ -51,11 +54,31 @@ export async function authRoutes(
         return reply.status(403).send({ reason: "email_not_verified" });
       }
 
-      if (!isAllowedDomain(payload.hd, payload.email, allowedDomains)) {
-        logger.warn("auth.rejected", { reason: "domain_not_allowed" });
-        return reply.status(403).send({ reason: "domain_not_allowed" });
+      const inviteToken = body.data.inviteToken;
+      const invitationByToken = inviteToken ? invRepo.findByToken(db, inviteToken) : null;
+      const domainCheck = checkDomain(
+        { hd: payload.hd, email: payload.email },
+        allowedDomains,
+        inviteToken,
+        invitationByToken,
+        new Date(),
+      );
+
+      if (!domainCheck.ok) {
+        logger.warn("auth.rejected", { reason: domainCheck.reason });
+        const status =
+          domainCheck.reason === "invitation_expired" ||
+          domainCheck.reason === "invitation_already_used"
+            ? 410
+            : 403;
+        const responseReason =
+          domainCheck.reason === "invitation_email_mismatch"
+            ? "domain_not_allowed"
+            : domainCheck.reason;
+        return reply.status(status).send({ reason: responseReason });
       }
 
+      const isInvited = domainCheck.reason === "invited";
       const domain = payload.email.split("@")[1] ?? "";
       const role = adminEmails.includes(payload.email) ? "admin" : "member";
       const user = upsertUser(db, {
@@ -65,11 +88,17 @@ export async function authRoutes(
         name: payload.name,
         avatar_url: payload.picture,
         role,
+        is_invited_external: isInvited ? 1 : 0,
       });
 
       if (adminEmails.includes(user.email) && user.role !== "admin") {
         promoteToAdmin(db, user.email);
         user.role = "admin";
+      }
+
+      if (isInvited) {
+        invRepo.markAccepted(db, domainCheck.invitationId, new Date().toISOString());
+        logger.info("invitation.accepted", { invitationId: domainCheck.invitationId });
       }
 
       const token = await signJwt(

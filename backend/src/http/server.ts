@@ -8,6 +8,7 @@ import { errorHandler } from "./plugins/error-handler.js";
 import { authGuard } from "./plugins/auth-guard.js";
 import { healthRoutes } from "./routes/health.js";
 import { authRoutes } from "./routes/auth.js";
+import { invitationsRoutes } from "./routes/invitations.js";
 import type { GoogleVerifier } from "../infra/auth/google-verifier.js";
 
 export interface ServerDeps {
@@ -30,6 +31,7 @@ export async function buildServer({ db, googleVerifier, env: envOverride }: Serv
   await app.register(healthRoutes, { db });
   await app.register(authRoutes, { db, googleVerifier, env });
   await app.register(authGuard, { db, env });
+  await app.register(invitationsRoutes, { db, env });
 
   app.addContentTypeParser("application/json", { parseAs: "string" }, (_, body, done) => {
     try {

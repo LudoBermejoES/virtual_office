@@ -16,7 +16,7 @@ El sistema MUST exigir un secret de sesión válido al arrancar y rechazar el bo
 - AND no se emiten cookies todavía (emisión llega en el change 003)
 
 ## Requirement: Login mediante ID token de Google
-El sistema MUST aceptar un ID token de Google y, tras validarlo server-side con `google-auth-library`, abrir una sesión emitiendo una cookie firmada.
+El sistema MUST aceptar un ID token de Google y, tras validarlo server-side con `google-auth-library`, abrir una sesión emitiendo una cookie firmada. El cuerpo del request MAY incluir `inviteToken` opcional para usuarios fuera de los dominios permitidos.
 
 #### Scenario: Login válido de empleado Teimas
 - GIVEN un empleado con cuenta Workspace cuyo `hd` está en `TEIMAS_DOMAINS`
@@ -90,3 +90,29 @@ El sistema MUST rechazar con 403 cualquier acceso a rutas marcadas como `require
 - GIVEN un usuario con `role="member"`
 - WHEN solicita una ruta protegida con `requireAdmin`
 - THEN la respuesta es 403
+
+## Requirement: Login de invitado externo
+El sistema MUST aceptar el login con Google de un usuario fuera de `TEIMAS_DOMAINS` cuando se acompañe un token de invitación viva cuyo email coincide con el del ID token.
+
+#### Scenario: Externo con invitación válida
+- GIVEN una invitación viva para `cliente@externo.com`
+- WHEN ese usuario hace `POST /api/auth/google { idToken, inviteToken }` con un ID token cuyo email es `cliente@externo.com` y `email_verified=true`
+- THEN la respuesta es 200 con cookie de sesión
+- AND el user creado tiene `is_invited_external=1` y `role="member"`
+- AND la invitación queda con `accepted_at = now`
+
+#### Scenario: Token de invitación de otro email
+- GIVEN una invitación viva para `cliente@externo.com`
+- WHEN se intenta loguear con un ID token de `attacker@otro.com` enviando ese mismo `inviteToken`
+- THEN la respuesta es 403 con `reason: "domain_not_allowed"`
+- AND la invitación NO se marca como aceptada
+
+#### Scenario: Token caducado
+- GIVEN una invitación cuyo `expires_at` ya pasó
+- WHEN el invitado intenta usar el `inviteToken`
+- THEN la respuesta es 410 con `reason: "invitation_expired"`
+
+#### Scenario: Token ya aceptado
+- GIVEN una invitación con `accepted_at` no nulo
+- WHEN se reusa el `inviteToken` en otro login
+- THEN la respuesta es 410 con `reason: "invitation_already_used"`

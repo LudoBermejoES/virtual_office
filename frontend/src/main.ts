@@ -11,7 +11,16 @@ async function preloadFonts(): Promise<void> {
   ]);
 }
 
+function captureInviteToken(): void {
+  const match = window.location.pathname.match(/^\/invite\/([A-Za-z0-9_-]+)\/?$/);
+  if (match && match[1]) {
+    localStorage.setItem("inviteToken", match[1]);
+    window.history.replaceState({}, "", "/");
+  }
+}
+
 async function main(): Promise<void> {
+  captureInviteToken();
   await preloadFonts();
 
   new Phaser.Game({

@@ -13,8 +13,11 @@ const envSchema = z.object({
 
   GOOGLE_CLIENT_ID: z.string().optional().default(""),
   GOOGLE_CLIENT_SECRET: z.string().optional().default(""),
-  TEIMAS_DOMAINS: z.string().default("teimas.com,teimas.es"),
+  TEIMAS_DOMAINS: z.string().default("teimas.com,teimas.es,teimassolutions.com"),
   ADMIN_EMAILS: z.string().default(""),
+
+  INVITATION_TTL_DAYS: z.coerce.number().int().positive().default(7),
+  PUBLIC_BASE_URL: z.string().default("http://localhost:5173"),
 
   SENTRY_DSN: z.string().optional().default(""),
 
