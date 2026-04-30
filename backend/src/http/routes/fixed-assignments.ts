@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import type { DatabaseSync } from "node:sqlite";
 import { z } from "zod";
+import { logger } from "../../config/logger.js";
 import * as fixedRepo from "../../infra/repos/fixed-assignments.js";
 import * as desksRepo from "../../infra/repos/desks.js";
 import { findUserById } from "../../infra/repos/users.js";
@@ -40,6 +41,11 @@ export async function fixedAssignmentsRoutes(
         deskId: desk.id,
         user: { id: user.id, name: user.name, avatar_url: user.avatar_url },
       });
+      logger.info("fixed.assigned", {
+        deskId: desk.id,
+        userId: user.id,
+        assignedBy: request.user!.id,
+      });
       return reply.status(201).send({ fixed });
     } catch (e) {
       if (e instanceof fixedRepo.FixedAssignmentConflict) {
@@ -63,6 +69,7 @@ export async function fixedAssignmentsRoutes(
 
     const removed = fixedRepo.deleteFixedAssignmentByDesk(db, params.data.id);
     if (!removed) return reply.status(404).send({ reason: "not_found" });
+    logger.info("fixed.removed", { deskId: params.data.id, removedBy: request.user!.id });
 
     const desk = desksRepo.findDeskById(db, params.data.id);
     if (desk) {

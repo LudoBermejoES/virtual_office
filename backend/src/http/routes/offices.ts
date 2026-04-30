@@ -220,6 +220,11 @@ export async function officesRoutes(
     featuresRepo.deleteFeatures(db, office.id);
     featuresRepo.insertFeatures(db, office.id, features);
 
+    logger.info("office.created", {
+      officeId: office.id,
+      name: office.name,
+      createdBy: request.user!.id,
+    });
     const finalOffice = officesRepo.findOfficeById(db, office.id)!;
     return reply.status(201).send({
       office: { ...finalOffice, tilesets: tilesetsRows },
@@ -400,6 +405,7 @@ export async function officesRoutes(
       return reply.status(400).send({ reason: "bad_request" });
     }
     officesRepo.deleteOffice(db, officeId);
+    logger.info("office.deleted", { officeId, deletedBy: request.user!.id });
     return reply.status(204).send();
   });
 

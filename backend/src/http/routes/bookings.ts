@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import type { DatabaseSync } from "node:sqlite";
 import { z } from "zod";
+import { logger } from "../../config/logger.js";
 import * as bookingsRepo from "../../infra/repos/bookings.js";
 import * as desksRepo from "../../infra/repos/desks.js";
 import * as fixedRepo from "../../infra/repos/fixed-assignments.js";
@@ -56,6 +57,12 @@ export async function bookingsRoutes(
           user: { id: user.id, name: user.name, avatar_url: user.avatar_url },
         });
       }
+      logger.info("booking.created", {
+        bookingId: booking.id,
+        deskId: desk.id,
+        userId: booking.user_id,
+        date: booking.date,
+      });
       return reply.status(201).send({ booking });
     } catch (e) {
       if (e instanceof UniqueViolation) {
@@ -93,6 +100,13 @@ export async function bookingsRoutes(
     }
 
     bookingsRepo.deleteBy(db, { desk_id: params.data.id, date: parsedDate.date });
+    logger.info("booking.deleted", {
+      bookingId: existing.id,
+      deskId: params.data.id,
+      userId: existing.user_id,
+      date: parsedDate.date,
+      deletedBy: me.id,
+    });
     const desk = desksRepo.findDeskById(db, params.data.id);
     if (desk) {
       hub.broadcast(officeRoom(desk.office_id), {

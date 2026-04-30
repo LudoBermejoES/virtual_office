@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import type { DatabaseSync } from "node:sqlite";
 import { z } from "zod";
 import { listUsers, findUserByEmail, updateUserRole } from "../../infra/repos/users.js";
+import { logger } from "../../config/logger.js";
 import type { Env } from "../../config/env.js";
 
 export async function usersRoutes(
@@ -28,6 +29,11 @@ export async function usersRoutes(
     if (!body.success) return reply.status(400).send({ reason: "bad_request" });
 
     updateUserRole(db, params.data.id, body.data.role);
+    logger.info("user.role_changed", {
+      targetUserId: params.data.id,
+      newRole: body.data.role,
+      changedBy: request.user!.id,
+    });
     return reply.status(200).send({ ok: true });
   });
 }

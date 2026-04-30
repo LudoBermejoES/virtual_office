@@ -4,6 +4,7 @@ import { pipeline } from "node:stream/promises";
 import { join } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 import { filesToDelete } from "./retention.js";
+import { logger } from "../../config/logger.js";
 
 interface BackupEnv {
   VO_BACKUP_DIR?: string;
@@ -30,6 +31,7 @@ export async function runBackup(db: DatabaseSync, env: BackupEnv): Promise<strin
 
   await applyRetention(backupDir);
 
+  logger.info("backup.completed", { path: gzPath });
   return gzPath;
 }
 
