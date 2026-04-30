@@ -15,6 +15,7 @@ import { officesRoutes } from "./routes/offices.js";
 import { desksRoutes } from "./routes/desks.js";
 import { bookingsRoutes } from "./routes/bookings.js";
 import { fixedAssignmentsRoutes } from "./routes/fixed-assignments.js";
+import { usersRoutes } from "./routes/users.js";
 import { occupancyWsRoutes } from "./ws/occupancy.js";
 import { testAuthRoutes } from "./routes/test-auth.js";
 import { WsHub } from "../infra/ws/hub.js";
@@ -55,6 +56,7 @@ export async function buildServer({ db, googleVerifier, env, hub: hubOverride }:
   await app.register(desksRoutes, { db, env });
   await app.register(bookingsRoutes, { db, env, hub });
   await app.register(fixedAssignmentsRoutes, { db, env, hub });
+  await app.register(usersRoutes, { db, env });
   await app.register(occupancyWsRoutes, { db, env, hub });
 
   if (env.TEST_AUTH === "on") {

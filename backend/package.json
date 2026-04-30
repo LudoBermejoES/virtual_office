@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/server.ts",
+    "dev": "tsx watch --env-file=.env src/server.ts",
     "build": "tsc --build && mkdir -p dist/infra/db/migrations && cp src/infra/db/migrations/*.sql dist/infra/db/migrations/",
     "start": "node dist/server.js",
     "test": "vitest run",
@@ -12,7 +12,7 @@
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src",
-    "bootstrap:admin": "tsx scripts/bootstrap-admin.ts"
+    "bootstrap:admin": "tsx --env-file=.env scripts/bootstrap-admin.ts"
   },
   "dependencies": {
     "@fastify/cookie": "^11.0.2",

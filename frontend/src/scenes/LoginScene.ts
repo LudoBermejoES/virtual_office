@@ -147,10 +147,14 @@ export class LoginScene extends Phaser.Scene {
       return;
     }
 
-    const me = (await meRes.json()) as { id: number; default_office_id: number | null };
+    const me = (await meRes.json()) as {
+      id: number;
+      role: "admin" | "member";
+      default_office_id: number | null;
+    };
     const offices = (await officesRes.json()) as OfficeSummary[];
 
-    officesStore.getState().setList(offices, me.id);
+    officesStore.getState().setList(offices, me.id, me.role);
 
     if (offices.length === 0) {
       this.scene.start("NoOfficeScene");

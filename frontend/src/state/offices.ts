@@ -4,13 +4,15 @@ import type { OfficeSummary } from "@virtual-office/shared";
 export interface OfficesStore {
   list: OfficeSummary[];
   meId: number;
-  setList: (list: OfficeSummary[], meId: number) => void;
+  meRole: "admin" | "member";
+  setList: (list: OfficeSummary[], meId: number, meRole: "admin" | "member") => void;
 }
 
 export const officesStore = createStore<OfficesStore>()((set) => ({
   list: [],
   meId: 0,
-  setList: (list, meId) => set({ list, meId }),
+  meRole: "member",
+  setList: (list, meId, meRole) => set({ list, meId, meRole }),
 }));
 
 export const VO_LAST_OFFICE_KEY = "vo_last_office";

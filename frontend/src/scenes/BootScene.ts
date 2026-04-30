@@ -55,6 +55,9 @@ export class BootScene extends Phaser.Scene {
       })
       .catch((err: unknown) => {
         console.warn("[BootScene] healthz no disponible:", err);
+      })
+      .finally(() => {
+        this.scene.start("LoginScene");
       });
   }
 }

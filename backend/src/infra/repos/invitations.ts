@@ -79,6 +79,17 @@ export function markAccepted(db: DatabaseSync, id: number, acceptedAt: string): 
   db.prepare("UPDATE invitations SET accepted_at = ? WHERE id = ?").run(acceptedAt, id);
 }
 
+export function renewById(
+  db: DatabaseSync,
+  id: number,
+  data: { token: string; expires_at: string },
+): InvitationRow | null {
+  db.prepare(
+    `UPDATE invitations SET token = ?, expires_at = ?, accepted_at = NULL WHERE id = ?`,
+  ).run(data.token, data.expires_at, id);
+  return findById(db, id);
+}
+
 export function revoke(db: DatabaseSync, id: number, now: string): void {
   db.prepare("UPDATE invitations SET expires_at = ? WHERE id = ?").run(now, id);
 }

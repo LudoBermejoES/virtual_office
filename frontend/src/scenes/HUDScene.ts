@@ -6,6 +6,7 @@ import { arcadeButton } from "../ui/arcade-button.js";
 import type { ArcadeButton } from "../ui/arcade-button.js";
 import { soundManager } from "../ui/sound.js";
 import { mountOfficeSelector } from "../ui/office-selector.js";
+import { mountAdminPanel, unmountAdminPanel, setEditDesksCallback } from "../ui/admin-panel.js";
 import { BASE_URL } from "../config.js";
 import type { OfficeDetail } from "../state/office.js";
 
@@ -16,8 +17,11 @@ export class HUDScene extends Phaser.Scene {
   private todayBtn: ArcadeButton | null = null;
   private muteBtn: Phaser.GameObjects.Text | null = null;
   private selectorEl: HTMLDivElement | null = null;
+  adminBtnEl: HTMLButtonElement | null = null;
   private debounceUntil = 0;
   private unsubscribe: (() => void) | null = null;
+  /** Injected in tests; falls back to globalThis.document at runtime. */
+  _document: typeof document = typeof document !== "undefined" ? document : (null as never);
 
   constructor() {
     super({ key: "HUDScene", active: false });
@@ -55,6 +59,7 @@ export class HUDScene extends Phaser.Scene {
     this.input.keyboard?.on("keydown-HOME", () => this.handleToday());
 
     this.mountSelectorOverlay();
+    this.mountAdminButton();
     this.refresh();
     this.unsubscribe = uiStore.subscribe(() => this.refresh());
 
@@ -63,7 +68,49 @@ export class HUDScene extends Phaser.Scene {
       this.unsubscribe = null;
       this.selectorEl?.remove();
       this.selectorEl = null;
+      this.adminBtnEl?.remove();
+      this.adminBtnEl = null;
+      unmountAdminPanel();
     });
+  }
+
+  private mountAdminButton(): void {
+    if (this._document == null) return;
+    const { meRole } = officesStore.getState();
+    if (meRole !== "admin") return;
+
+    setEditDesksCallback((officeId: number) => {
+      fetch(`${BASE_URL}/api/offices/${officeId}`, { credentials: "include" })
+        .then(async (res) => {
+          if (!res.ok) return;
+          const detail = (await res.json()) as OfficeDetail;
+          this.scene.stop("HUDScene");
+          this.scene.start("AdminMapScene", {
+            office: detail.office,
+            desks: detail.desks,
+          });
+        })
+        .catch(() => {});
+    });
+
+    const btn = this._document.createElement("button") as HTMLButtonElement;
+    btn.id = "hud-admin-btn";
+    btn.textContent = "⚙";
+    Object.assign(btn.style, {
+      position: "fixed",
+      top: "8px",
+      right: "80px",
+      zIndex: "50",
+      background: "transparent",
+      border: "none",
+      color: "#8e92a8",
+      fontFamily: '"Press Start 2P"',
+      fontSize: "14px",
+      cursor: "pointer",
+    });
+    btn.addEventListener("click", () => mountAdminPanel());
+    this._document.body.appendChild(btn);
+    this.adminBtnEl = btn;
   }
 
   private mountSelectorOverlay(): void {

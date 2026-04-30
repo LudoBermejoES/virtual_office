@@ -403,6 +403,30 @@ export async function officesRoutes(
     return reply.status(204).send();
   });
 
+  app.get("/api/offices/:id/admins", { preHandler: app.requireAdmin }, async (request, reply) => {
+    const params = z.object({ id: z.coerce.number().int().positive() }).safeParse(request.params);
+    if (!params.success) return reply.status(400).send({ reason: "bad_request" });
+
+    const office = officesRepo.findOfficeById(db, params.data.id);
+    if (!office) return reply.status(404).send({ reason: "not_found" });
+
+    return reply.send(officesRepo.listOfficeAdminsDetail(db, params.data.id));
+  });
+
+  app.get(
+    "/api/offices/:id/fixed-assignments",
+    { preHandler: app.requireAdmin },
+    async (request, reply) => {
+      const params = z.object({ id: z.coerce.number().int().positive() }).safeParse(request.params);
+      if (!params.success) return reply.status(400).send({ reason: "bad_request" });
+
+      const office = officesRepo.findOfficeById(db, params.data.id);
+      if (!office) return reply.status(404).send({ reason: "not_found" });
+
+      return reply.send(fixedRepo.listByOfficeDetail(db, params.data.id));
+    },
+  );
+
   app.post("/api/offices/:id/admins", { preHandler: app.requireAdmin }, async (request, reply) => {
     const params = z.object({ id: z.coerce.number().int().positive() }).safeParse(request.params);
     if (!params.success) return reply.status(400).send({ reason: "bad_request" });

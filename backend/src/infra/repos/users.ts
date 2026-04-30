@@ -57,3 +57,19 @@ export function findUserById(db: DatabaseSync, id: number): UserRow | null {
     null
   );
 }
+
+export function listUsers(db: DatabaseSync): UserRow[] {
+  return db.prepare("SELECT * FROM users ORDER BY created_at ASC").all() as unknown as UserRow[];
+}
+
+export function findUserByEmail(db: DatabaseSync, email: string): UserRow | null {
+  return (
+    (db.prepare("SELECT * FROM users WHERE email = ?").get(email) as unknown as
+      | UserRow
+      | undefined) ?? null
+  );
+}
+
+export function updateUserRole(db: DatabaseSync, id: number, role: UserRole): void {
+  db.prepare("UPDATE users SET role = ? WHERE id = ?").run(role, id);
+}

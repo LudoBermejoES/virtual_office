@@ -69,4 +69,29 @@ export async function invitationsRoutes(
     invRepo.revoke(db, params.data.id, new Date().toISOString());
     return reply.status(204).send();
   });
+
+  app.post(
+    "/api/invitations/:id/renew",
+    { preHandler: app.requireAdmin },
+    async (request, reply) => {
+      const params = z.object({ id: z.coerce.number().int().positive() }).safeParse(request.params);
+      if (!params.success) return reply.status(400).send({ reason: "bad_request" });
+
+      const existing = invRepo.findById(db, params.data.id);
+      if (!existing) return reply.status(404).send({ reason: "not_found" });
+
+      const token = generateInviteToken();
+      const expiresAt = new Date(
+        Date.now() + env.INVITATION_TTL_DAYS * 24 * 3600 * 1000,
+      ).toISOString();
+
+      const updated = invRepo.renewById(db, params.data.id, { token, expires_at: expiresAt });
+      logger.info("invitation.renewed_by_id", {
+        id: params.data.id,
+        tokenPrefix: token.slice(0, 6),
+      });
+
+      return reply.status(200).send({ invitation: updated });
+    },
+  );
 }

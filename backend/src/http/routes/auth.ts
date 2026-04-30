@@ -45,8 +45,8 @@ export async function authRoutes(
       try {
         if (!googleVerifier) throw new Error("GoogleVerifier no configurado");
         payload = await googleVerifier.verify(body.data.idToken);
-      } catch {
-        logger.warn("auth.rejected", { reason: "invalid_token" });
+      } catch (err) {
+        logger.warn("auth.rejected", { reason: "invalid_token", error: String(err) });
         return reply.status(401).send({ reason: "invalid_token" });
       }
 

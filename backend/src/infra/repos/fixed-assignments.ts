@@ -71,6 +71,51 @@ export interface FixedAssignmentWithUser extends FixedAssignmentRow {
   userAvatarUrl: string | null;
 }
 
+export interface FixedAssignmentDetail {
+  id: number;
+  desk: { id: number; label: string };
+  user: { id: number; name: string; email: string; avatar_url: string | null };
+  assigned_by: { id: number; name: string };
+  created_at: string;
+}
+
+export function listByOfficeDetail(db: DatabaseSync, officeId: number): FixedAssignmentDetail[] {
+  const rows = db
+    .prepare(
+      `SELECT
+         f.id, f.created_at,
+         d.id AS desk_id, d.label AS desk_label,
+         u.id AS user_id, u.name AS user_name, u.email AS user_email, u.avatar_url AS user_avatar_url,
+         ab.id AS by_id, ab.name AS by_name
+       FROM fixed_assignments f
+       JOIN desks d ON d.id = f.desk_id
+       JOIN users u ON u.id = f.user_id
+       JOIN users ab ON ab.id = f.assigned_by_user_id
+       WHERE d.office_id = ?
+       ORDER BY f.created_at ASC`,
+    )
+    .all(officeId) as unknown as {
+    id: number;
+    created_at: string;
+    desk_id: number;
+    desk_label: string;
+    user_id: number;
+    user_name: string;
+    user_email: string;
+    user_avatar_url: string | null;
+    by_id: number;
+    by_name: string;
+  }[];
+
+  return rows.map((r) => ({
+    id: r.id,
+    created_at: r.created_at,
+    desk: { id: r.desk_id, label: r.desk_label },
+    user: { id: r.user_id, name: r.user_name, email: r.user_email, avatar_url: r.user_avatar_url },
+    assigned_by: { id: r.by_id, name: r.by_name },
+  }));
+}
+
 export function listByOffice(db: DatabaseSync, officeId: number): FixedAssignmentWithUser[] {
   return db
     .prepare(

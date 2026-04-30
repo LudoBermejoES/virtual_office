@@ -5,6 +5,7 @@ import { openDb } from "./infra/db/sqlite.js";
 import { runMigrations } from "./infra/db/migrations.js";
 import { buildServer } from "./http/server.js";
 import { startBackupScheduler } from "./infra/backup/scheduler.js";
+import { GoogleVerifier } from "./infra/auth/google-verifier.js";
 
 async function main(): Promise<void> {
   initSentry();
@@ -13,7 +14,14 @@ async function main(): Promise<void> {
   runMigrations(db);
   logger.info("Migraciones aplicadas");
 
-  const server = await buildServer({ db, env });
+  const googleVerifier = env.GOOGLE_CLIENT_ID
+    ? new GoogleVerifier(env.GOOGLE_CLIENT_ID)
+    : undefined;
+  const server = await buildServer({
+    db,
+    env,
+    ...(googleVerifier ? { googleVerifier } : {}),
+  });
 
   const shutdown = async (signal: string): Promise<void> => {
     logger.info(`Señal recibida: ${signal}. Cerrando servidor...`);

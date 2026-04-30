@@ -140,6 +140,25 @@ export function listOfficeAdmins(db: DatabaseSync, officeId: number): number[] {
   return rows.map((r) => r.user_id);
 }
 
+export interface OfficeAdminDetail {
+  user_id: number;
+  email: string;
+  name: string;
+  granted_at: string;
+}
+
+export function listOfficeAdminsDetail(db: DatabaseSync, officeId: number): OfficeAdminDetail[] {
+  return db
+    .prepare(
+      `SELECT oa.user_id, u.email, u.name, oa.granted_at
+       FROM office_admins oa
+       JOIN users u ON u.id = oa.user_id
+       WHERE oa.office_id = ?
+       ORDER BY oa.granted_at ASC`,
+    )
+    .all(officeId) as unknown as OfficeAdminDetail[];
+}
+
 export function addOfficeAdmin(
   db: DatabaseSync,
   officeId: number,
