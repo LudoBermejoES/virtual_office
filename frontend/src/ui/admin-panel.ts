@@ -1,16 +1,22 @@
 import { BASE_URL } from "../config.js";
+import { officesStore } from "../state/offices.js";
 
 const TABS = ["OFICINAS", "USUARIOS", "FIJOS"] as const;
 type Tab = (typeof TABS)[number];
 
 let panelEl: HTMLDivElement | null = null;
 let editDesksCallback: ((officeId: number) => void) | null = null;
+let pickDeskCallback: ((onPicked: (deskId: number, deskLabel: string) => void) => void) | null = null;
 
 export function setEditDesksCallback(cb: (officeId: number) => void): void {
   editDesksCallback = cb;
 }
 
-export function mountAdminPanel(initialTab: Tab = "OFICINAS"): void {
+export function setPickDeskCallback(cb: (onPicked: (deskId: number, deskLabel: string) => void) => void): void {
+  pickDeskCallback = cb;
+}
+
+export function mountAdminPanel(initialTab: Tab = "OFICINAS", preselectedDeskId?: number): void {
   if (panelEl) return;
 
   const overlay = document.createElement("div");
@@ -95,7 +101,7 @@ export function mountAdminPanel(initialTab: Tab = "OFICINAS"): void {
     content.innerHTML = "";
     if (tab === "OFICINAS") renderOficinas(content);
     else if (tab === "USUARIOS") renderUsuarios(content);
-    else if (tab === "FIJOS") renderFijos(content);
+    else if (tab === "FIJOS") renderFijos(content, preselectedDeskId);
   }
 
   for (const tab of TABS) {
@@ -776,12 +782,18 @@ function buildInvRow(
 
 // ── Fijos tab ─────────────────────────────────────────────────────────────────
 
-function renderFijos(container: HTMLElement): void {
+type UserRow = { id: number; name: string; email: string; avatarUrl?: string | null };
+type DeskRow = { id: number; label: string };
+type AssignmentRow = { id: number; desk: { label: string }; user: { name: string; email: string } };
+
+function renderFijos(container: HTMLElement, preselectedDeskId?: number): void {
   container.innerHTML = '<p style="color:#8e92a8;font-size:10px">Cargando oficinas…</p>';
 
-  fetch(`${BASE_URL}/api/offices`, { credentials: "include" })
-    .then((r) => r.json())
-    .then((offices: { id: number; name: string }[]) => {
+  Promise.all([
+    fetch(`${BASE_URL}/api/offices`, { credentials: "include" }).then((r) => r.json()) as Promise<{ id: number; name: string }[]>,
+    fetch(`${BASE_URL}/api/users`, { credentials: "include" }).then((r) => r.json()) as Promise<UserRow[]>,
+  ])
+    .then(([offices, users]) => {
       container.innerHTML = "";
 
       if (offices.length === 0) {
@@ -789,8 +801,8 @@ function renderFijos(container: HTMLElement): void {
         return;
       }
 
+      // Office selector
       const sel = document.createElement("select");
-      sel.id = "admin-fijos-office-select";
       Object.assign(sel.style, {
         background: "#0d0d1a",
         border: "1px solid #36e36c",
@@ -799,6 +811,7 @@ function renderFijos(container: HTMLElement): void {
         fontSize: "18px",
         padding: "4px 8px",
         marginBottom: "12px",
+        display: "block",
       });
       for (const o of offices) {
         const opt = document.createElement("option");
@@ -808,69 +821,237 @@ function renderFijos(container: HTMLElement): void {
       }
       container.appendChild(sel);
 
+      // New assignment form
+      const formWrap = document.createElement("div");
+      Object.assign(formWrap.style, {
+        borderLeft: "2px solid #b66dff",
+        paddingLeft: "10px",
+        marginBottom: "16px",
+      });
+
+      const formTitle = document.createElement("p");
+      formTitle.textContent = "NUEVA ASIGNACIÓN FIJA";
+      Object.assign(formTitle.style, { color: "#b66dff", fontSize: "9px", marginBottom: "8px" });
+      formWrap.appendChild(formTitle);
+
+      // Desk selector (populated on office change)
+      const deskSel = document.createElement("select");
+      deskSel.id = "admin-fijos-desk-sel";
+      Object.assign(deskSel.style, {
+        background: "#0d0d1a",
+        border: "1px solid #8e92a8",
+        color: "#f5f5f5",
+        fontFamily: '"VT323", monospace',
+        fontSize: "16px",
+        padding: "4px 8px",
+        marginBottom: "8px",
+        display: "block",
+        width: "100%",
+      });
+      formWrap.appendChild(deskSel);
+
+      // Pick desk from map button
+      if (pickDeskCallback) {
+        const pickBtn = document.createElement("button");
+        pickBtn.textContent = "📍 Seleccionar en mapa";
+        Object.assign(pickBtn.style, {
+          background: "transparent",
+          border: "1px solid #5cf6ff",
+          color: "#5cf6ff",
+          fontFamily: '"Press Start 2P", monospace',
+          fontSize: "8px",
+          padding: "5px 10px",
+          cursor: "pointer",
+          marginBottom: "8px",
+          display: "block",
+        });
+        pickBtn.addEventListener("click", () => {
+          unmountAdminPanel();
+          pickDeskCallback!((deskId, _deskLabel) => {
+            mountAdminPanel("FIJOS", deskId);
+          });
+        });
+        formWrap.appendChild(pickBtn);
+      }
+
+      // User list with avatar
+      const userList = document.createElement("div");
+      Object.assign(userList.style, {
+        maxHeight: "160px",
+        overflowY: "auto",
+        marginBottom: "8px",
+        border: "1px solid #8e92a8",
+      });
+
+      let selectedUserId: number | null = officesStore.getState().meId;
+
+      const renderUserList = (): void => {
+        userList.innerHTML = "";
+        for (const u of users) {
+          const row = document.createElement("div");
+          Object.assign(row.style, {
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+            padding: "6px 8px",
+            cursor: "pointer",
+            background: u.id === selectedUserId ? "#1a1a2e" : "transparent",
+            borderBottom: "1px solid #1a1a2e",
+          });
+
+          if (u.avatarUrl) {
+            const img = document.createElement("img");
+            img.src = u.avatarUrl;
+            Object.assign(img.style, {
+              width: "28px",
+              height: "28px",
+              borderRadius: "50%",
+              objectFit: "cover",
+              flexShrink: "0",
+            });
+            row.appendChild(img);
+          } else {
+            const initials = document.createElement("div");
+            initials.textContent = u.name.slice(0, 2).toUpperCase();
+            Object.assign(initials.style, {
+              width: "28px",
+              height: "28px",
+              borderRadius: "50%",
+              background: "#b66dff",
+              color: "#0d0d1a",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: "10px",
+              fontFamily: '"Press Start 2P", monospace',
+              flexShrink: "0",
+            });
+            row.appendChild(initials);
+          }
+
+          const info = document.createElement("div");
+          info.style.overflow = "hidden";
+          const name = document.createElement("p");
+          name.textContent = u.name;
+          Object.assign(name.style, { color: "#f5f5f5", fontSize: "11px", margin: "0" });
+          const email = document.createElement("p");
+          email.textContent = u.email;
+          Object.assign(email.style, { color: "#8e92a8", fontSize: "10px", margin: "0" });
+          info.appendChild(name);
+          info.appendChild(email);
+          row.appendChild(info);
+
+          row.addEventListener("click", () => {
+            selectedUserId = u.id;
+            renderUserList();
+          });
+          userList.appendChild(row);
+        }
+      };
+      renderUserList();
+      formWrap.appendChild(userList);
+
+      const assignBtn = document.createElement("button");
+      assignBtn.textContent = "ASIGNAR";
+      Object.assign(assignBtn.style, {
+        background: "#b66dff",
+        border: "none",
+        color: "#0d0d1a",
+        fontFamily: '"Press Start 2P", monospace',
+        fontSize: "9px",
+        padding: "6px 12px",
+        cursor: "pointer",
+      });
+      assignBtn.addEventListener("click", () => {
+        const deskId = parseInt(deskSel.value, 10);
+        if (!deskId || !selectedUserId) return;
+        assignBtn.textContent = "…";
+        fetch(`${BASE_URL}/api/desks/${deskId}/fixed`, {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId: selectedUserId }),
+        })
+          .then((r) => {
+            if (r.ok) {
+              assignBtn.textContent = "ASIGNAR";
+              loadFijos(parseInt(sel.value, 10));
+            } else {
+              assignBtn.textContent = "ERROR";
+              setTimeout(() => { assignBtn.textContent = "ASIGNAR"; }, 2000);
+            }
+          })
+          .catch(() => { assignBtn.textContent = "ERROR"; });
+      });
+      formWrap.appendChild(assignBtn);
+      container.appendChild(formWrap);
+
+      // Assignments list
       const listContainer = document.createElement("div");
       container.appendChild(listContainer);
+
+      const loadDesks = (officeId: number): void => {
+        fetch(`${BASE_URL}/api/offices/${officeId}`, { credentials: "include" })
+          .then((r) => r.json())
+          .then((detail: { desks: DeskRow[] }) => {
+            deskSel.innerHTML = "";
+            for (const d of detail.desks) {
+              const opt = document.createElement("option");
+              opt.value = String(d.id);
+              opt.textContent = d.label;
+              deskSel.appendChild(opt);
+            }
+            if (preselectedDeskId != null) {
+              deskSel.value = String(preselectedDeskId);
+            }
+          })
+          .catch(() => {});
+      };
 
       const loadFijos = (officeId: number): void => {
         listContainer.innerHTML = '<p style="color:#8e92a8;font-size:10px">Cargando…</p>';
         fetch(`${BASE_URL}/api/offices/${officeId}/fixed-assignments`, { credentials: "include" })
           .then((r) => r.json())
-          .then(
-            (
-              assignments: {
-                id: number;
-                desk: { label: string };
-                user: { name: string; email: string };
-              }[],
-            ) => {
-              listContainer.innerHTML = "";
-              if (assignments.length === 0) {
-                listContainer.innerHTML =
-                  '<p style="color:#8e92a8;font-size:10px">Sin asignaciones fijas.</p>';
-                return;
-              }
-              for (const a of assignments) {
-                const row = document.createElement("div");
-                Object.assign(row.style, {
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px",
-                  marginBottom: "6px",
-                  fontSize: "10px",
-                  color: "#f5f5f5",
-                });
-
-                const info = document.createElement("span");
-                info.textContent = `${a.desk.label} → ${a.user.name} (${a.user.email})`;
-                info.style.flex = "1";
-                row.appendChild(info);
-
-                const delBtn = document.createElement("button");
-                delBtn.textContent = "Eliminar";
-                Object.assign(delBtn.style, {
-                  background: "transparent",
-                  border: "1px solid #e33636",
-                  color: "#e33636",
-                  fontFamily: '"Press Start 2P", monospace',
-                  fontSize: "8px",
-                  padding: "4px 6px",
-                  cursor: "pointer",
-                });
-                delBtn.addEventListener("click", () => {
-                  fetch(`${BASE_URL}/api/desks/${a.id}/fixed`, {
-                    method: "DELETE",
-                    credentials: "include",
-                  })
-                    .then((r) => {
-                      if (r.ok) loadFijos(officeId);
-                    })
-                    .catch(() => {});
-                });
-                row.appendChild(delBtn);
-                listContainer.appendChild(row);
-              }
-            },
-          )
+          .then((assignments: AssignmentRow[]) => {
+            listContainer.innerHTML = "";
+            if (assignments.length === 0) {
+              listContainer.innerHTML = '<p style="color:#8e92a8;font-size:10px">Sin asignaciones fijas.</p>';
+              return;
+            }
+            for (const a of assignments) {
+              const row = document.createElement("div");
+              Object.assign(row.style, {
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                marginBottom: "6px",
+                fontSize: "10px",
+                color: "#f5f5f5",
+              });
+              const info = document.createElement("span");
+              info.textContent = `${a.desk.label} → ${a.user.name} (${a.user.email})`;
+              info.style.flex = "1";
+              row.appendChild(info);
+              const delBtn = document.createElement("button");
+              delBtn.textContent = "Eliminar";
+              Object.assign(delBtn.style, {
+                background: "transparent",
+                border: "1px solid #e33636",
+                color: "#e33636",
+                fontFamily: '"Press Start 2P", monospace',
+                fontSize: "8px",
+                padding: "4px 6px",
+                cursor: "pointer",
+              });
+              delBtn.addEventListener("click", () => {
+                fetch(`${BASE_URL}/api/desks/${a.id}/fixed`, { method: "DELETE", credentials: "include" })
+                  .then((r) => { if (r.ok) loadFijos(officeId); })
+                  .catch(() => {});
+              });
+              row.appendChild(delBtn);
+              listContainer.appendChild(row);
+            }
+          })
           .catch(() => {
             listContainer.innerHTML = '<p style="color:#e33636;font-size:10px">Error.</p>';
           });
@@ -878,10 +1059,12 @@ function renderFijos(container: HTMLElement): void {
 
       sel.addEventListener("change", () => {
         const id = parseInt(sel.value, 10);
-        if (!isNaN(id)) loadFijos(id);
+        if (!isNaN(id)) { loadDesks(id); loadFijos(id); }
       });
 
-      loadFijos(parseInt(sel.value, 10));
+      const initialId = parseInt(sel.value, 10);
+      loadDesks(initialId);
+      loadFijos(initialId);
     })
     .catch(() => {
       container.innerHTML = '<p style="color:#e33636;font-size:10px">Error al cargar.</p>';

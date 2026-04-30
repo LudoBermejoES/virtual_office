@@ -15,7 +15,8 @@ export function arcadeButton(
   const frame = scene.add
     .nineslice(x, y, "frame-9slice", 0, 200, 56, 16, 16, 16, 16)
     .setOrigin(0.5)
-    .setInteractive({ useHandCursor: true });
+    .setInteractive({ useHandCursor: true })
+    .setVisible(false);
 
   const text = scene.add
     .text(x, y, label, {
@@ -24,13 +25,14 @@ export function arcadeButton(
       color: "#f5f5f5",
     })
     .setOrigin(0.5)
-    .setScrollFactor(0);
+    .setScrollFactor(0)
+    .setInteractive({ useHandCursor: true });
 
-  frame.on("pointerdown", () => {
+  text.on("pointerdown", () => {
     text.setY(y + 2);
   });
 
-  frame.on("pointerup", () => {
+  text.on("pointerup", () => {
     text.setY(y);
     onClick();
   });

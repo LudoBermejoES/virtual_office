@@ -369,6 +369,9 @@ export async function officesRoutes(
       user: { id: number; name: string; avatar_url: string | null };
     }> = [];
 
+    const dailyByUserId = new Map<number, (typeof rows)[number]>();
+    for (const b of rows) dailyByUserId.set(b.user_id, b);
+
     for (const b of rows) {
       bookings.push({
         id: b.id,
@@ -381,6 +384,7 @@ export async function officesRoutes(
     }
     for (const f of fixedRows) {
       if (dailyByDeskId.has(f.desk_id)) continue;
+      if (dailyByUserId.has(f.user_id)) continue;
       bookings.push({
         id: -f.id,
         deskId: f.desk_id,

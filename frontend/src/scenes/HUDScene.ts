@@ -6,7 +6,7 @@ import { arcadeButton } from "../ui/arcade-button.js";
 import type { ArcadeButton } from "../ui/arcade-button.js";
 import { soundManager } from "../ui/sound.js";
 import { mountOfficeSelector } from "../ui/office-selector.js";
-import { mountAdminPanel, unmountAdminPanel, setEditDesksCallback } from "../ui/admin-panel.js";
+import { mountAdminPanel, unmountAdminPanel, setEditDesksCallback, setPickDeskCallback } from "../ui/admin-panel.js";
 import { BASE_URL } from "../config.js";
 import type { OfficeDetail } from "../state/office.js";
 
@@ -91,6 +91,15 @@ export class HUDScene extends Phaser.Scene {
           });
         })
         .catch(() => {});
+    });
+
+    setPickDeskCallback((onPicked) => {
+      const officeScene = this.scene.manager.getScene("OfficeScene") as
+        | (Phaser.Scene & { activatePickDeskMode?: (cb: (deskId: number, label: string) => void) => void })
+        | null;
+      officeScene?.activatePickDeskMode?.((deskId, label) => {
+        onPicked(deskId, label);
+      });
     });
 
     const btn = this._document.createElement("button") as HTMLButtonElement;

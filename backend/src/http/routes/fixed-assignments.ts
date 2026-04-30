@@ -30,6 +30,13 @@ export async function fixedAssignmentsRoutes(
     const user = findUserById(db, body.data.userId);
     if (!user) return reply.status(404).send({ reason: "user_not_found" });
 
+    // Si el usuario ya tiene un fijo en otro puesto, liberarlo antes
+    const existing = fixedRepo.findByUserId(db, user.id);
+    if (existing && existing.desk_id !== desk.id) {
+      fixedRepo.deleteFixedAssignmentByDesk(db, existing.desk_id);
+      hub.broadcast(officeRoom(desk.office_id), { type: "desk.unfixed", deskId: existing.desk_id });
+    }
+
     try {
       const fixed = fixedRepo.createFixedAssignment(db, {
         desk_id: desk.id,

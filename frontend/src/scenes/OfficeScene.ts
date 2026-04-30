@@ -10,6 +10,7 @@ import { SpritePool } from "../render/sprite-pool.js";
 import { deskState } from "../domain/desk-state.js";
 import { connectOffice } from "../realtime/socket.js";
 import { uiStore, shouldApply } from "../state/ui.js";
+import { officesStore } from "../state/offices.js";
 import type { ConnectHandle } from "../realtime/socket.js";
 import type { WsServerMessage } from "@virtual-office/shared";
 import type { Desk, OfficeDetail } from "../state/office.js";
@@ -17,6 +18,35 @@ import type { Desk, OfficeDetail } from "../state/office.js";
 export class OfficeScene extends Phaser.Scene {
   private detail: OfficeDetail | null = null;
   private meId: number = 0;
+  private pickDeskMode: ((deskId: number, label: string) => void) | null = null;
+  private pickBannerEl: HTMLDivElement | null = null;
+
+  activatePickDeskMode(onPicked: (deskId: number, label: string) => void): void {
+    this.pickDeskMode = onPicked;
+    const banner = document.createElement("div");
+    this.pickBannerEl = banner;
+    Object.assign(banner.style, {
+      position: "fixed",
+      top: "52px",
+      left: "50%",
+      transform: "translateX(-50%)",
+      background: "#5cf6ff",
+      color: "#0b0d1a",
+      fontFamily: '"Press Start 2P", monospace',
+      fontSize: "10px",
+      padding: "8px 16px",
+      zIndex: "200",
+      pointerEvents: "none",
+    });
+    banner.textContent = "SELECCIONA UN PUESTO EN EL MAPA";
+    document.body.appendChild(banner);
+  }
+
+  private deactivatePickDeskMode(): void {
+    this.pickBannerEl?.remove();
+    this.pickBannerEl = null;
+    this.pickDeskMode = null;
+  }
   private deskRects: Map<number, Phaser.GameObjects.Rectangle> = new Map();
   private deskAvatars: Map<number, AvatarVisual> = new Map();
   private deskSeatSprites: Map<number, Phaser.GameObjects.Sprite> = new Map();
@@ -372,6 +402,14 @@ export class OfficeScene extends Phaser.Scene {
 
   private async handleDeskClick(desk: Desk): Promise<void> {
     if (!this.detail) return;
+
+    if (this.pickDeskMode) {
+      const cb = this.pickDeskMode;
+      this.deactivatePickDeskMode();
+      cb(desk.id, desk.label);
+      return;
+    }
+
     const state = deskState(desk, this.detail.bookings, this.meId);
 
     if (state === "fixed") {
@@ -381,7 +419,12 @@ export class OfficeScene extends Phaser.Scene {
     }
     if (state === "occupied") {
       const b = this.detail.bookings.find((x) => x.deskId === desk.id);
-      this.showFeedback(`Ocupado por ${b?.user.name ?? "otro usuario"}`);
+      const isAdmin = officesStore.getState().meRole === "admin";
+      if (isAdmin && window.confirm(`¿Liberar el puesto de ${b?.user.name ?? "otro usuario"}?`)) {
+        await this.releaseDesk(desk);
+      } else if (!isAdmin) {
+        this.showFeedback(`Ocupado por ${b?.user.name ?? "otro usuario"}`);
+      }
       return;
     }
 
