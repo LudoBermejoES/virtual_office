@@ -141,7 +141,7 @@ describe("POST/DELETE /api/desks/:id/fixed", () => {
     expect(res.json<{ reason: string }>().reason).toBe("desk_already_fixed");
   });
 
-  it("user ya tiene fixed en otro desk → 409 user_already_has_fixed", async () => {
+  it("reasignar fixed de un usuario a otro desk → 201 y el anterior queda libre", async () => {
     await server.app.inject({
       method: "POST",
       url: `/api/desks/${deskIds[0]}/fixed`,
@@ -154,8 +154,17 @@ describe("POST/DELETE /api/desks/:id/fixed", () => {
       headers: { cookie: aliceCookie },
       body: { userId: bobId },
     });
-    expect(res.statusCode).toBe(409);
-    expect(res.json<{ reason: string }>().reason).toBe("user_already_has_fixed");
+    expect(res.statusCode).toBe(201);
+    const body = res.json<{ fixed: { desk_id: number; user_id: number } }>();
+    expect(body.fixed).toMatchObject({ desk_id: deskIds[1], user_id: bobId });
+
+    // El desk anterior ya no tiene fijo
+    const delOld = await server.app.inject({
+      method: "DELETE",
+      url: `/api/desks/${deskIds[0]}/fixed`,
+      headers: { cookie: aliceCookie },
+    });
+    expect(delOld.statusCode).toBe(404);
   });
 
   it("userId inexistente → 404", async () => {
@@ -312,6 +321,35 @@ describe("GET /api/offices/:id?date=X con fixed", () => {
     }>();
     expect(body.date).toBe(todayIso());
     expect(body.bookings.some((b) => b.deskId === deskIds[0] && b.type === "fixed")).toBe(true);
+  });
+
+  it("usuario con daily en otro puesto ese día → fixed no aparece en snapshot", async () => {
+    const date = addDaysIso(todayIso(), 1);
+    // Bob tiene fijo en deskIds[0]
+    await server.app.inject({
+      method: "POST",
+      url: `/api/desks/${deskIds[0]}/fixed`,
+      headers: { cookie: aliceCookie },
+      body: { userId: bobId },
+    });
+    // Bob elige manualmente deskIds[1] ese día
+    testDb.db
+      .prepare("INSERT INTO bookings (desk_id, user_id, date, type) VALUES (?, ?, ?, ?)")
+      .run(deskIds[1], bobId, date, "daily");
+
+    const res = await server.app.inject({
+      method: "GET",
+      url: `/api/offices/${officeId}?date=${date}`,
+      headers: { cookie: aliceCookie },
+    });
+    const body = res.json<{
+      bookings: Array<{ deskId: number; userId: number; type: string }>;
+    }>();
+    // Bob solo aparece en su reserva diaria, no en el fijo
+    const bobBookings = body.bookings.filter((b) => b.userId === bobId);
+    expect(bobBookings).toHaveLength(1);
+    expect(bobBookings[0]!.deskId).toBe(deskIds[1]);
+    expect(bobBookings[0]!.type).toBe("daily");
   });
 });
 
