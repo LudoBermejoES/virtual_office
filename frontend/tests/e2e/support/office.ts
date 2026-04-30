@@ -4,6 +4,18 @@ import type { TestDesk, TestOffice } from "./types.js";
 
 const require = createRequire(import.meta.url);
 
+async function getAdminCookie(): Promise<string> {
+  const res = await fetch(`${BACKEND}/api/test/session`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ email: "setup-admin@e2e.internal", role: "admin" }),
+  });
+  if (!res.ok) throw new Error(`getAdminCookie failed: ${res.status}`);
+  const setCookie = res.headers.get("set-cookie") ?? "";
+  const match = /^([^;]+)/.exec(setCookie);
+  return match?.[1] ?? "";
+}
+
 const BACKEND = process.env["PLAYWRIGHT_BASE_URL"] ?? "http://localhost:18081";
 
 function makePng(): Buffer {
@@ -88,10 +100,12 @@ export async function setupTestOffice(
     { label: "A2", x: 240, y: 110 },
   ],
 ): Promise<TestOffice> {
+  const adminCookie = await getAdminCookie();
   const tmjBuffer = Buffer.from(makeMinimalTmj());
   const pngBuffer = makePng();
 
   const res = await request.post(`${BACKEND}/api/offices`, {
+    headers: { cookie: adminCookie },
     multipart: {
       name: "test-office",
       tmj: { name: "map.tmj", mimeType: "application/json", buffer: tmjBuffer },
@@ -109,6 +123,7 @@ export async function setupTestOffice(
   const desks: TestDesk[] = [];
   for (const def of deskDefs) {
     const deskRes = await request.post(`${BACKEND}/api/offices/${officeId}/desks`, {
+      headers: { cookie: adminCookie },
       data: def,
     });
     if (!deskRes.ok()) {

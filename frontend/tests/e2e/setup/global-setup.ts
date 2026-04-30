@@ -7,9 +7,11 @@ import { fileURLToPath } from "node:url";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 let backendProcess: ReturnType<typeof spawn> | null = null;
+let frontendProcess: ReturnType<typeof spawn> | null = null;
 let tmpDbDir: string | null = null;
 
 const E2E_PORT = 18081;
+const FRONTEND_PORT = 5173;
 
 export default async function globalSetup() {
   tmpDbDir = mkdtempSync(join(tmpdir(), "virtual-office-e2e-"));
@@ -66,7 +68,39 @@ export default async function globalSetup() {
 
   process.env["PLAYWRIGHT_BASE_URL"] = `http://localhost:${E2E_PORT}`;
 
+  await new Promise<void>((resolve, reject) => {
+    frontendProcess = spawn(join(__dirname, "../../../node_modules/.bin/vite"), ["preview", "--port", String(FRONTEND_PORT), "--host"], {
+      cwd: join(__dirname, "../../../"),
+      env: { ...process.env },
+      stdio: "pipe",
+    });
+
+    frontendProcess.on("error", reject);
+
+    const timeout = setTimeout(
+      () => reject(new Error("Frontend e2e no arrancó en 15s")),
+      15_000,
+    );
+
+    const checkFrontend = () => {
+      fetch(`http://localhost:${FRONTEND_PORT}/`)
+        .then((res) => {
+          if (res.ok) {
+            clearTimeout(timeout);
+            process.env["PLAYWRIGHT_FRONTEND_URL"] = `http://localhost:${FRONTEND_PORT}`;
+            resolve();
+          } else {
+            setTimeout(checkFrontend, 300);
+          }
+        })
+        .catch(() => setTimeout(checkFrontend, 300));
+    };
+
+    setTimeout(checkFrontend, 800);
+  });
+
   return async () => {
+    frontendProcess?.kill("SIGTERM");
     backendProcess?.kill("SIGTERM");
     await new Promise((r) => setTimeout(r, 500));
     if (tmpDbDir) rmSync(tmpDbDir, { recursive: true, force: true });

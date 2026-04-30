@@ -121,7 +121,9 @@
       "Bash(sed -i '' '/^## ADDED Requirements$/d' /Users/ludo/code/teimas_space/openspec/specs/ui-game/spec.md)",
       "Bash(sed -i '' 's/^### Requirement:/## Requirement:/g' /Users/ludo/code/teimas_space/openspec/specs/ui-game/spec.md)",
       "WebFetch(domain:opengameart.org)",
-      "Bash(unzip -l /tmp/sfx512.zip)"
+      "Bash(unzip -l /tmp/sfx512.zip)",
+      "Bash(pnpm vitest *)",
+      "Bash(SESSION_SECRET=\"supersecretodealmenos32caracteresaqui\" pnpm vitest run tests/integration/test-auth.test.ts)"
     ],
     "deny": [
       "Read(.env)",

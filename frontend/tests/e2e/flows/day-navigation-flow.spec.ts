@@ -18,6 +18,10 @@ function addDays(date: string, days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
+type Snapshot = {
+  bookings: Array<{ deskId: number; userId: number }>;
+};
+
 test("reserva en día +1 no aparece en hoy, sí en +1", async ({ request, context }) => {
   const alice = await loginAs(request, context, { email: "alice-daynav@example.com", role: "member" });
   const { officeId, desks } = await setupTestOffice(request);
@@ -33,13 +37,13 @@ test("reserva en día +1 no aparece en hoy, sí en +1", async ({ request, contex
 
   const snapToday = await request.get(`${BACKEND}/api/offices/${officeId}?date=${today}`);
   expect(snapToday.status()).toBe(200);
-  const todayData = await snapToday.json<{ desks: Array<{ id: number; booking: unknown }> }>();
-  const deskToday = todayData.desks.find((d) => d.id === desk.id);
-  expect(deskToday?.booking).toBeNull();
+  const todayData = await snapToday.json() as Snapshot;
+  const bookingToday = todayData.bookings.find((b) => b.deskId === desk.id);
+  expect(bookingToday).toBeUndefined();
 
   const snapTomorrow = await request.get(`${BACKEND}/api/offices/${officeId}?date=${tomorrow}`);
   expect(snapTomorrow.status()).toBe(200);
-  const tomorrowData = await snapTomorrow.json<{ desks: Array<{ id: number; booking: { user_id: number } | null }> }>();
-  const deskTomorrow = tomorrowData.desks.find((d) => d.id === desk.id);
-  expect(deskTomorrow?.booking?.user_id).toBe(alice.id);
+  const tomorrowData = await snapTomorrow.json() as Snapshot;
+  const bookingTomorrow = tomorrowData.bookings.find((b) => b.deskId === desk.id);
+  expect(bookingTomorrow?.userId).toBe(alice.id);
 });
