@@ -6,6 +6,7 @@ import websocket from "@fastify/websocket";
 import type { DatabaseSync } from "node:sqlite";
 import type { Env } from "../config/env.js";
 import { errorHandler } from "./plugins/error-handler.js";
+import { metricsPluginWrapped } from "./plugins/metrics.js";
 import { authGuard } from "./plugins/auth-guard.js";
 import { healthRoutes } from "./routes/health.js";
 import { authRoutes } from "./routes/auth.js";
@@ -44,6 +45,7 @@ export async function buildServer({ db, googleVerifier, env, hub: hubOverride }:
   });
   await app.register(websocket);
   await app.register(errorHandler);
+  await app.register(metricsPluginWrapped, { env });
 
   await app.register(healthRoutes, { db });
   await app.register(authRoutes, { db, googleVerifier, env });

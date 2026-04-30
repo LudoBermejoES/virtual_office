@@ -4,6 +4,7 @@ import { initSentry } from "./infra/observability/sentry.js";
 import { openDb } from "./infra/db/sqlite.js";
 import { runMigrations } from "./infra/db/migrations.js";
 import { buildServer } from "./http/server.js";
+import { startBackupScheduler } from "./infra/backup/scheduler.js";
 
 async function main(): Promise<void> {
   initSentry();
@@ -27,6 +28,7 @@ async function main(): Promise<void> {
 
   await server.listen({ port: env.PORT, host: "0.0.0.0" });
   logger.info("Servidor arrancado", { port: env.PORT });
+  startBackupScheduler(db, env);
 }
 
 main().catch((err: unknown) => {

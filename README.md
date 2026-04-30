@@ -147,6 +147,7 @@ El script actualiza el campo `role='admin'` para ese email. Si el usuario no exi
 
 - [Estrategia TDD](doc/tests/README.md) — pirámide, herramientas, mapeo Scenario → test, anti-patrones.
 - [Arquitectura backend](doc/be/README.md) — schema SQL, endpoints, WS, observabilidad, PM2.
+- [Operaciones](doc/be/OPERATIONS.md) — backups, restore, `/metrics`, `/readyz`, Sentry, troubleshooting.
 - [Arquitectura frontend](doc/fe/README.md) — Phaser tilemap, escenas, render con Tiled, tipografía.
 - [Referencia OpenSpec](doc/openspec/README.md) — qué es, cómo se usa el CLI y los `/opsx:*`.
 
@@ -158,7 +159,7 @@ El script actualiza el campo `role='admin'` para ese email. Si el usuario no exi
 - **TDD obligatorio**: cada `#### Scenario:` de un spec produce un test que se escribe **antes** del código.
 - **Lint y typecheck en verde** antes de cerrar un change.
 - **Coverage ≥ 80%** en líneas, statements, branches y funciones.
-- **Sin secretos en el repo**: `.env*` están gitignorados; usa `.env.example` como plantilla.
+- **Sin secretos en el repo**: `.env*` están gitignorados; usa `.env.example` (dev) o `.env.production.example` (prod) como plantillas.
 - **Sin PII en logs**: ni emails completos, ni tokens, ni payloads de auth.
 
 ---

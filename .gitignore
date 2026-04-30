@@ -33,6 +33,7 @@ packages/*/dist/
 .env.*
 !.env.example
 !.env.template
+!.env.production.example
 *.pem
 *.key
 secrets/

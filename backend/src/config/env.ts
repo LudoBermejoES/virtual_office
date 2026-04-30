@@ -23,6 +23,13 @@ const envSchema = z.object({
   BOOKING_HORIZON_DAYS: z.coerce.number().int().positive().default(60),
 
   SENTRY_DSN: z.string().optional().default(""),
+  GIT_SHA: z.string().optional(),
+
+  VO_BACKUP_DIR: z.string().optional().default("./backups"),
+  VO_BACKUP_CRON: z.string().optional().default("0 3 * * *"),
+
+  BASIC_AUTH_METRICS_USER: z.string().optional(),
+  BASIC_AUTH_METRICS_PASS: z.string().optional(),
 
   TEST_AUTH: z.enum(["on", "off"]).default("off"),
 
