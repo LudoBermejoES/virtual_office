@@ -1,7 +1,13 @@
 # UI Game
 
+## Purpose
 
-## Requirement: Navegación entre días con teclado y botones
+Define la presentación arcade de la oficina virtual en el cliente: la vista del mapa Tiled con sus puestos y avatares, la navegación entre días, la tipografía pixel y la paleta de colores, y los componentes interactivos (botones 9-slice, sonidos retro).
+
+## Requirements
+
+
+### Requirement: Navegación entre días con teclado y botones
 El sistema MUST permitir al usuario avanzar y retroceder entre días desde la `OfficeScene` mediante botones HUD y atajos de teclado, dentro del intervalo `[hoy - HISTORY_VISIBLE_DAYS, hoy + BOOKING_HORIZON_DAYS - 1]`.
 
 #### Scenario: Avanzar un día
@@ -32,7 +38,7 @@ El sistema MUST permitir al usuario avanzar y retroceder entre días desde la `O
 - THEN la acción no produce cambio
 - AND el botón `<` queda deshabilitado
 
-## Requirement: Persistencia de día en la sesión del navegador
+### Requirement: Persistencia de día en la sesión del navegador
 El sistema MUST recordar el último día visitado durante la sesión del navegador, restaurándolo al recargar; MUST NOT persistir entre cierres y aperturas de pestaña distintos.
 
 #### Scenario: Recarga conserva el día
@@ -45,7 +51,7 @@ El sistema MUST recordar el último día visitado durante la sesión del navegad
 - WHEN abre una nueva pestaña hoy `2026-05-10`
 - THEN la fecha mostrada es la del día actual `2026-05-10`
 
-## Requirement: Aplicación selectiva de deltas en realtime
+### Requirement: Aplicación selectiva de deltas en realtime
 El sistema MUST filtrar los mensajes WebSocket de tipo `desk.booked` y `desk.released` para que solo modifiquen el snapshot visible cuando coinciden con la fecha seleccionada en el cliente. Los mensajes `desk.fixed`, `desk.unfixed` y `office.updated` afectan a todos los días.
 
 #### Scenario: Reserva del día visible
@@ -63,7 +69,7 @@ El sistema MUST filtrar los mensajes WebSocket de tipo `desk.booked` y `desk.rel
 - WHEN llega `{ type: "desk.fixed", deskId: A1.id, user }`
 - THEN A1 se renderiza como fijo en la vista de Alice
 
-## Requirement: Avatar circular en puestos ocupados
+### Requirement: Avatar circular en puestos ocupados
 El sistema MUST renderizar la fotografía de Google del usuario que ocupa un puesto, recortada con una máscara circular, centrada sobre el cuadrado del puesto en `OfficeScene`. La fuente del avatar es siempre `users.avatar_url`, persistido durante el login con Google a partir del claim `picture` del ID token; este change NO MUST emitir requests a un endpoint propio de avatares.
 
 #### Scenario: Avatar de Google visible en el puesto
@@ -79,7 +85,7 @@ El sistema MUST renderizar la fotografía de Google del usuario que ocupa un pue
 - THEN aparece un tooltip HTML mostrando el nombre completo de Alice cerca del puntero
 - AND el tooltip desaparece al alejar el ratón o pulsar Escape
 
-## Requirement: Fallback con iniciales cuando el avatar no carga
+### Requirement: Fallback con iniciales cuando el avatar no carga
 El sistema MUST mostrar un fallback compuesto por un círculo de color determinístico (basado en el `userId`) y las iniciales del nombre cuando el avatar no esté disponible o falle la carga. El fallback NUNCA MUST hacer reintentos infinitos contra Google.
 
 #### Scenario: URL del avatar devuelve 403
@@ -94,7 +100,7 @@ El sistema MUST mostrar un fallback compuesto por un círculo de color determin�
 - WHEN ocupa un puesto y otro usuario lo ve
 - THEN se renderiza el fallback con sus iniciales
 
-## Requirement: Carga progresiva sin flash
+### Requirement: Carga progresiva sin flash
 El sistema MUST mostrar el fallback con iniciales mientras la textura del avatar se descarga, reemplazándolo por la imagen real cuando esté lista, sin descartar el booking del snapshot.
 
 #### Scenario: Snapshot inicial con varios avatares no cacheados
@@ -104,7 +110,7 @@ El sistema MUST mostrar el fallback con iniciales mientras la textura del avatar
 - AND a medida que llegan los `filecomplete-image-*`, los fallbacks se reemplazan por las fotografías circulares
 - AND no hay parpadeos o cuadrados vacíos en ningún momento
 
-## Requirement: Tipografía pixel coherente
+### Requirement: Tipografía pixel coherente
 El sistema MUST emplear únicamente Press Start 2P para titulares, botones y etiquetas de fecha; y VT323 para cuerpo, mensajes y tooltips. Cualquier texto visible NUNCA MUST renderizarse con la fuente por defecto del sistema operativo o del navegador.
 
 #### Scenario: Botones con fuente arcade
@@ -117,7 +123,7 @@ El sistema MUST emplear únicamente Press Start 2P para titulares, botones y eti
 - WHEN se inspecciona el `font-family` computado del párrafo descriptivo
 - THEN el valor incluye `"VT323"` antes del fallback monoespaciado
 
-## Requirement: Paleta arcade aplicada de forma consistente
+### Requirement: Paleta arcade aplicada de forma consistente
 El sistema MUST usar exclusivamente los colores definidos en `theme.ts` y en las variables CSS del proyecto para fondos, textos y estados de puesto. NUNCA MUST usarse colores hardcoded fuera del tema.
 
 #### Scenario: Estado libre en color verde de tema
@@ -130,7 +136,7 @@ El sistema MUST usar exclusivamente los colores definidos en `theme.ts` y en las
 - WHEN se inspecciona el borde
 - THEN coincide con `THEME.fixed` (#b66dff)
 
-## Requirement: Botones con look 9-slice
+### Requirement: Botones con look 9-slice
 El sistema MUST renderizar los botones interactivos (LoginScene, modales, HUD) con un marco 9-slice de estética arcade y un efecto visual de presionar (descenso de 2 px del label en `pointerdown`).
 
 #### Scenario: Press feedback
@@ -139,7 +145,7 @@ El sistema MUST renderizar los botones interactivos (LoginScene, modales, HUD) c
 - THEN el texto del botón baja 2 px verticalmente
 - AND al `mouseup` vuelve a su posición y se ejecuta la acción
 
-## Requirement: Sonido retro opcional
+### Requirement: Sonido retro opcional
 El sistema MUST exponer un toggle de sonido en el HUD que controla los efectos sonoros retro (click, booking, error). El estado del toggle MUST persistir en `localStorage` y por defecto MUST estar mute.
 
 #### Scenario: Toggle mute persiste
@@ -154,7 +160,7 @@ El sistema MUST exponer un toggle de sonido en el HUD que controla los efectos s
 - THEN el toggle muestra estado muted
 - AND ninguna acción produce sonido hasta que active el toggle
 
-## Requirement: Render pixel sin antialiasing
+### Requirement: Render pixel sin antialiasing
 El sistema MUST configurar Phaser con `pixelArt: true`, `roundPixels: true` y filtro `NEAREST`, y MUST aplicar `image-rendering: pixelated` al canvas, para garantizar la estética pixel.
 
 #### Scenario: Canvas con render pixelado
@@ -162,7 +168,7 @@ El sistema MUST configurar Phaser con `pixelArt: true`, `roundPixels: true` y fi
 - WHEN se inspecciona la propiedad CSS `image-rendering` del canvas Phaser
 - THEN el valor es `pixelated`
 
-## Requirement: Visual regression sobre el tema
+### Requirement: Visual regression sobre el tema
 El sistema MUST mantener un suite de tests Playwright con baselines de las pantallas principales (login, oficina con los cuatro estados de puesto, modal de reserva), tolerando un diff máximo de 0.1% de píxeles.
 
 #### Scenario: Cambio inadvertido de fuente

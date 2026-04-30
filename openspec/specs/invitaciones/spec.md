@@ -1,6 +1,12 @@
 # Invitaciones
 
-## Requirement: Creación de invitación por administrador
+## Purpose
+
+Define el mecanismo por el que los administradores invitan a personas externas a la organización (sin email @teimas) a unirse a la oficina virtual. Cubre la creación de invitaciones con token único, su entrega via link, el canje en el primer login y la revocación.
+
+## Requirements
+
+### Requirement: Creación de invitación por administrador
 El sistema MUST permitir a un usuario administrador crear una invitación para un email externo, generando un token de un solo uso con expiración limitada.
 
 #### Scenario: Admin crea invitación válida
@@ -34,7 +40,7 @@ El sistema MUST permitir a un usuario administrador crear una invitación para u
 - WHEN solicita `POST /api/invitations`
 - THEN la respuesta es 403
 
-## Requirement: Listado y revocación de invitaciones
+### Requirement: Listado y revocación de invitaciones
 El sistema MUST permitir a un admin listar invitaciones vivas y revocarlas individualmente.
 
 #### Scenario: Listado por defecto solo vivas
@@ -54,7 +60,7 @@ El sistema MUST permitir a un admin listar invitaciones vivas y revocarlas indiv
 - AND la fila persiste pero con `expires_at` ajustado al momento actual
 - AND la invitación deja de aparecer en el listado por defecto
 
-## Requirement: No exposición del token completo en logs
+### Requirement: No exposición del token completo en logs
 El sistema MUST NOT escribir el token completo de invitación en los logs estructurados.
 
 #### Scenario: Crear invitación

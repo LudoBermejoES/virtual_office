@@ -1,7 +1,13 @@
 # Realtime
 
+## Purpose
 
-## Requirement: Canal WebSocket por oficina autenticado
+Cubre la propagación en tiempo real de los cambios de estado de la oficina (reservas, asignaciones fijas, recarga de mapa) a todos los clientes conectados a través de WebSocket, sin necesidad de polling.
+
+## Requirements
+
+
+### Requirement: Canal WebSocket por oficina autenticado
 El sistema MUST exponer un endpoint WebSocket por oficina que solo acepte conexiones con cookie de sesión válida y que difunda en tiempo real los cambios de ocupación a todos los suscriptores de esa oficina.
 
 #### Scenario: Conexión sin cookie
@@ -15,7 +21,7 @@ El sistema MUST exponer un endpoint WebSocket por oficina que solo acepte conexi
 - THEN el socket se mantiene abierto
 - AND el primer mensaje recibido es `{ type: "snapshot.ts", at: <ISO8601> }`
 
-## Requirement: Broadcast de reservas diarias
+### Requirement: Broadcast de reservas diarias
 El sistema MUST emitir un mensaje `desk.booked` o `desk.released` a todos los clientes conectados a la oficina cuando un puesto se reserva o libera para una fecha.
 
 #### Scenario: Reserva propaga
@@ -28,7 +34,7 @@ El sistema MUST emitir un mensaje `desk.booked` o `desk.released` a todos los cl
 - WHEN Alice libera A1 del `2026-05-04`
 - THEN ambos reciben `{ type: "desk.released", deskId: A1.id, date: "2026-05-04" }`
 
-## Requirement: Broadcast de asignaciones fijas
+### Requirement: Broadcast de asignaciones fijas
 El sistema MUST emitir `desk.fixed` o `desk.unfixed` cuando un admin asigna o retira la asignación fija de un puesto.
 
 #### Scenario: Asignación fija propaga
@@ -41,7 +47,7 @@ El sistema MUST emitir `desk.fixed` o `desk.unfixed` cuando un admin asigna o re
 - WHEN un admin retira el fijo de A1
 - THEN ambos reciben `{ type: "desk.unfixed", deskId: A1.id }`
 
-## Requirement: Broadcast de cambios estructurales
+### Requirement: Broadcast de cambios estructurales
 El sistema MUST emitir `office.updated` cuando se sube o reemplaza el mapa de la oficina, o se crean/borran/modifican puestos.
 
 #### Scenario: Cambio del mapa propaga
@@ -49,7 +55,7 @@ El sistema MUST emitir `office.updated` cuando se sube o reemplaza el mapa de la
 - WHEN un admin reemplaza el mapa con `PATCH /api/offices/:id`
 - THEN ambos reciben `{ type: "office.updated", officeId }`
 
-## Requirement: Reconexión segura del cliente
+### Requirement: Reconexión segura del cliente
 El sistema MUST permitir al cliente reconectarse con backoff exponencial tras una desconexión imprevista, salvo en cierres de autorización (código 4001) que MUST NOT reintentarse.
 
 #### Scenario: Cierre por desconexión de red
@@ -62,7 +68,7 @@ El sistema MUST permitir al cliente reconectarse con backoff exponencial tras un
 - WHEN el server cierra con código 4001
 - THEN el cliente NO reintenta y redirige a `LoginScene`
 
-## Requirement: Heartbeat
+### Requirement: Heartbeat
 El sistema MUST cerrar conexiones inactivas tras un periodo de silencio (60 s sin tráfico).
 
 #### Scenario: Cliente silente

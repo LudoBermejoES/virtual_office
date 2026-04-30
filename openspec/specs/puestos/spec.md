@@ -1,7 +1,13 @@
 # Puestos
 
+## Purpose
 
-## Requirement: Creación manual de puesto por coordenada
+Define los puestos de trabajo (desks) dentro de una oficina: su posición en el mapa, su nombre, su origen (manual o extraído del .tmj de Tiled) y las reglas de creación, edición y borrado por parte de administradores.
+
+## Requirements
+
+
+### Requirement: Creación manual de puesto por coordenada
 El sistema MUST permitir a un administrador crear un puesto definido por una única coordenada `(x, y)` sobre el mapa de la oficina. El render del puesto se hace como un cuadrado de ancho fijo `DESK_SIZE_PX` centrado en ese punto. Los puestos creados por esta vía MUST quedar persistidos con `source = "manual"`.
 
 #### Scenario: Punto válido dentro del mapa
@@ -47,7 +53,7 @@ El sistema MUST permitir a un administrador crear un puesto definido por una ún
 - WHEN solicita `POST /api/offices/:id/desks`
 - THEN la respuesta es 403
 
-## Requirement: Modificación de puesto
+### Requirement: Modificación de puesto
 El sistema MUST permitir a un admin actualizar la etiqueta o las coordenadas de un puesto, manteniendo las mismas validaciones que en la creación.
 
 #### Scenario: PATCH cambia label
@@ -67,7 +73,7 @@ El sistema MUST permitir a un admin actualizar la etiqueta o las coordenadas de 
 - THEN la respuesta es 422 con `reason: "too_close_to_existing"`
 - AND el desk no se modifica
 
-## Requirement: Borrado de puesto
+### Requirement: Borrado de puesto
 El sistema MUST permitir a un admin borrar un puesto, independientemente de su `source`.
 
 #### Scenario: DELETE
@@ -76,7 +82,7 @@ El sistema MUST permitir a un admin borrar un puesto, independientemente de su `
 - THEN la respuesta es 204
 - AND el desk desaparece del listado
 
-## Requirement: Importación automática desde object layer Tiled "desks"
+### Requirement: Importación automática desde object layer Tiled "desks"
 El sistema MUST extraer y persistir como puestos los objetos del object layer llamado `desks` del `.tmj` cuando se sube o reemplaza el bundle Tiled, marcando los puestos resultantes con `source = "tiled"`. Los objetos que no superen la validación geométrica MUST reportarse como warnings sin abortar la subida.
 
 #### Scenario: Object layer con points
@@ -120,7 +126,7 @@ El sistema MUST extraer y persistir como puestos los objetos del object layer ll
 - THEN no se crea ningún desk automáticamente
 - AND `desksImported` es 0
 
-## Requirement: Re-importación manual desde Tiled
+### Requirement: Re-importación manual desde Tiled
 El sistema MUST permitir al admin pedir explícitamente la re-importación de los puestos desde el object layer Tiled del `.tmj` actual mediante `POST /api/offices/:id/desks/import-from-tiled`. La operación MUST ser idempotente: NUNCA MUST sobreescribir desks existentes con `source="manual"` ni duplicar desks `source="tiled"` que ya tengan el mismo label.
 
 #### Scenario: Re-importación añade solo lo nuevo

@@ -1,7 +1,13 @@
 # Reservas
 
+## Purpose
 
-## Requirement: Reserva diaria de un puesto
+Modela las reservas diarias y las asignaciones fijas de puestos: cómo un usuario reserva un puesto para un día, cómo un administrador marca un puesto como fijo de un usuario concreto, las restricciones de unicidad y el horizonte de fechas permitido.
+
+## Requirements
+
+
+### Requirement: Reserva diaria de un puesto
 El sistema MUST permitir a un usuario autenticado reservar un puesto libre para una fecha concreta dentro de un horizonte futuro acotado.
 
 #### Scenario: Reserva en puesto libre
@@ -37,7 +43,7 @@ El sistema MUST permitir a un usuario autenticado reservar un puesto libre para 
 - WHEN intenta `POST /api/desks/:id/bookings`
 - THEN la respuesta es 401
 
-## Requirement: Liberación de reserva
+### Requirement: Liberación de reserva
 El sistema MUST permitir al usuario liberar su propia reserva. Un administrador MAY liberar reservas ajenas para casos administrativos. Las reservas de tipo `fixed` no se liberan por este endpoint.
 
 #### Scenario: Usuario libera su reserva
@@ -62,7 +68,7 @@ El sistema MUST permitir al usuario liberar su propia reserva. Un administrador 
 - WHEN cualquiera intenta liberarla
 - THEN la respuesta es 404
 
-## Requirement: Asignación de puesto fijo
+### Requirement: Asignación de puesto fijo
 El sistema MUST permitir a un administrador asignar a un usuario como ocupante fijo de un puesto, lo cual hace que ese puesto aparezca como ocupado por ese usuario en cualquier día consultado, salvo que ya exista una reserva diaria heredada.
 
 #### Scenario: Asignación válida
@@ -87,7 +93,7 @@ El sistema MUST permitir a un administrador asignar a un usuario como ocupante f
 - WHEN solicita `POST /api/desks/:id/fixed`
 - THEN la respuesta es 403
 
-## Requirement: Retirada de puesto fijo
+### Requirement: Retirada de puesto fijo
 El sistema MUST permitir a un admin retirar la asignación fija de un puesto.
 
 #### Scenario: DELETE válido
@@ -101,7 +107,7 @@ El sistema MUST permitir a un admin retirar la asignación fija de un puesto.
 - WHEN un admin solicita `DELETE /api/desks/{A1.id}/fixed`
 - THEN la respuesta es 404
 
-## Requirement: Materialización del fijo en el detalle del día
+### Requirement: Materialización del fijo en el detalle del día
 El sistema MUST incluir la asignación fija como `booking` virtual con `type="fixed"` cuando se consulte un día sin reserva diaria preexistente para ese puesto.
 
 #### Scenario: Día sin daily previa
@@ -116,7 +122,7 @@ El sistema MUST incluir la asignación fija como `booking` virtual con `type="fi
 - WHEN se consulta `GET /api/offices/:id?date=2026-05-04`
 - THEN `bookings` muestra la daily de Carol con `type: "daily"`, NO el fijo de Bob
 
-## Requirement: Bloqueo de daily sobre desk con fijo
+### Requirement: Bloqueo de daily sobre desk con fijo
 El sistema MUST rechazar nuevas reservas diarias sobre un puesto que tiene asignación fija.
 
 #### Scenario: Reserva daily sobre desk con fijo

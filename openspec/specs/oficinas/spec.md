@@ -1,6 +1,11 @@
-# Delta — Oficinas
+# Oficinas
 
-## ADDED Requirements
+## Purpose
+
+Modela las oficinas físicas de Teimas como entidades en el sistema, su mapa Tiled (tilemap + tilesets), su estado de salud y los cimientos de persistencia. Es la base sobre la que se montan puestos, reservas y vista realtime.
+
+## Requirements
+
 
 ### Requirement: Estado de salud reportable
 El sistema MUST exponer un endpoint público que reporte el estado del proceso, de la base de datos y de la observabilidad sin requerir autenticación.

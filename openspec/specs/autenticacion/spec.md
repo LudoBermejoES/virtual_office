@@ -1,6 +1,12 @@
 # Autenticación
 
-## Requirement: Configuración de sesión preparada
+## Purpose
+
+Establece cómo los usuarios de Teimas y los invitados externos prueban su identidad y mantienen una sesión válida en el sistema. Cubre la verificación del ID token de Google, la apertura y cierre de sesiones, la protección de rutas autenticadas y las salvaguardas de configuración (secrets, dominios permitidos).
+
+## Requirements
+
+### Requirement: Configuración de sesión preparada
 El sistema MUST exigir un secret de sesión válido al arrancar y rechazar el boot si no está presente, aunque todavía no emita ni valide cookies.
 
 #### Scenario: Arranque sin SESSION_SECRET
@@ -15,7 +21,7 @@ El sistema MUST exigir un secret de sesión válido al arrancar y rechazar el bo
 - THEN el servidor escucha en el puerto configurado
 - AND no se emiten cookies todavía (emisión llega en el change 003)
 
-## Requirement: Login mediante ID token de Google
+### Requirement: Login mediante ID token de Google
 El sistema MUST aceptar un ID token de Google y, tras validarlo server-side con `google-auth-library`, abrir una sesión emitiendo una cookie firmada. El cuerpo del request MAY incluir `inviteToken` opcional para usuarios fuera de los dominios permitidos.
 
 #### Scenario: Login válido de empleado Teimas
@@ -50,7 +56,7 @@ El sistema MUST aceptar un ID token de Google y, tras validarlo server-side con 
 - THEN la respuesta es 429
 - AND el log incluye `auth.rate_limited` con la IP
 
-## Requirement: Promoción a administrador
+### Requirement: Promoción a administrador
 El sistema MUST marcar como `admin` a cualquier usuario cuyo email aparezca en `ADMIN_EMAILS` en el momento del login.
 
 #### Scenario: Admin definido por env
@@ -64,7 +70,7 @@ El sistema MUST marcar como `admin` a cualquier usuario cuyo email aparezca en `
 - WHEN vuelve a hacer login
 - THEN su `role` se actualiza a `"admin"`
 
-## Requirement: Sesión por cookie firmada
+### Requirement: Sesión por cookie firmada
 El sistema MUST proteger las rutas autenticadas exigiendo una cookie `session` con un JWT HS256 válido y vigente.
 
 #### Scenario: Acceso autenticado a /api/me
@@ -83,7 +89,7 @@ El sistema MUST proteger las rutas autenticadas exigiendo una cookie `session` c
 - THEN la respuesta es 204
 - AND la cookie `session` se invalida en el cliente (`Max-Age=0`)
 
-## Requirement: Autorización por rol
+### Requirement: Autorización por rol
 El sistema MUST rechazar con 403 cualquier acceso a rutas marcadas como `requireAdmin` cuando el rol del usuario sea distinto de `admin`.
 
 #### Scenario: Member intenta acción admin
@@ -91,7 +97,7 @@ El sistema MUST rechazar con 403 cualquier acceso a rutas marcadas como `require
 - WHEN solicita una ruta protegida con `requireAdmin`
 - THEN la respuesta es 403
 
-## Requirement: Login de invitado externo
+### Requirement: Login de invitado externo
 El sistema MUST aceptar el login con Google de un usuario fuera de `TEIMAS_DOMAINS` cuando se acompañe un token de invitación viva cuyo email coincide con el del ID token.
 
 #### Scenario: Externo con invitación válida
