@@ -5,6 +5,7 @@ export default defineConfig({
     environment: "node",
     globals: false,
     include: ["tests/**/*.test.ts"],
+    setupFiles: ["tests/support/vitest-setup.ts"],
     pool: "forks",
     isolate: true,
     coverage: {

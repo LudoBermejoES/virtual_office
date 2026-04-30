@@ -475,6 +475,34 @@ const config: Phaser.Types.Core.GameConfig = {
 
 ---
 
+## Render de zonas y salas
+
+Las features (zones, rooms, labels) se obtienen de `GET /api/offices/:id` bajo `features: { zones, rooms, labels }` y se renderizan en `OfficeScene` antes que los desks.
+
+### ZoneRenderer (`src/render/zone-renderer.ts`)
+
+- `ZONE_COLORS`: mapa de `ZoneKind → color hex` usando colores del `theme.ts`.
+- `zoneAlpha = 0.25`: transparencia de relleno de zonas.
+- `drawZone(graphics, zone)`: pinta un `Phaser.GameObjects.Graphics` con `fillRect`/`strokeRect` para rects, o `fillPoints`/`strokePoints` para polígonos. Depth `-10` (por debajo de desks).
+- `drawLabel(scene, label)`: crea un `Text` con `Press Start 2P` (`font="display"`) o `VT323` (`font="body"`), stroke negro para legibilidad.
+- `findZoneAt(px, py, zones)`: hit-test puro (sin Phaser). Usa ray-casting para polígonos y AABB para rects. Devuelve la primera `Zone` que contiene el punto, o `null`.
+
+### HUD de zona activa
+
+En `OfficeScene.create()` se registra `input.on("pointermove")` que llama a `findZoneAt` con las coordenadas del mundo (`pointer.worldX`, `pointer.worldY`) y actualiza un `Text` VT323 encima del feedback text. El texto se borra al salir de todas las zonas.
+
+### Flujo en `OfficeScene`
+
+```
+create()
+  → zoneGraphics = this.add.graphics()
+  → renderZones()           ← drawZone por zona/sala, drawLabel por label
+  → renderDesks()           ← depth 0, encima de zonas
+  → input "pointermove"     ← findZoneAt → zoneText
+```
+
+`renderZones` no se vuelve a llamar en `rerenderDesks` (las zonas no cambian al re-bookear); solo se refrescan al recibir `office.updated` vía WebSocket (que desencadena `refreshSnapshot` → `rerenderDesks` completo).
+
 ## Fuentes consultadas
 
 - [Phaser 4 release & 2026 perf — Seeles AI](https://www.seeles.ai/resources/blogs/phaser-js-game-development-2026)

@@ -470,6 +470,23 @@ El admin diseña la oficina en [Tiled](https://www.mapeditor.org/) y exporta:
 - Los objetos rectángulo (`width > 0`) toman el centro como `(x, y)`.
 - Cualquier objeto que falle validación se reporta en la respuesta como warning per-objeto, no aborta la subida.
 
+**Object layers de features** (zonas, salas, labels):
+
+El backend reconoce tres layers por nombre exacto:
+
+| Layer | Tipo de objetos | Geometría soportada | Propiedad obligatoria |
+|-------|----------------|--------------------|-----------------------|
+| `zones` | áreas | rect, polygon | `kind` (string) |
+| `rooms` | áreas | rect, polygon | `kind` (string) |
+| `labels` | puntos | point | `font` (string), `size` (int) |
+
+- `kind` debe ser uno de: `open`, `meeting`, `kitchen`, `phone-booth`, `hall`.
+- `font` debe ser `display` o `body`; `size` debe ser `12`, `16` o `24`.
+- Coordenadas de polígono en Tiled son relativas al origen del objeto; el backend las convierte a absolutas.
+- `name` del objeto: 1–80 caracteres, sin chars de control (regex `/^[^\x00-\x1f\x7f]{1,80}$/`).
+- Máximo 200 features totales (zones + rooms + labels). Si se supera, la subida se rechaza con `too_many_features`.
+- Las features se almacenan en la tabla `office_features` y se devuelven en `GET /api/offices/:id` bajo la clave `features: { zones, rooms, labels }`.
+
 ---
 
 ## Geometría de zonas (puestos)

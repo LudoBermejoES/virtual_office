@@ -123,7 +123,10 @@
       "WebFetch(domain:opengameart.org)",
       "Bash(unzip -l /tmp/sfx512.zip)",
       "Bash(pnpm vitest *)",
-      "Bash(SESSION_SECRET=\"supersecretodealmenos32caracteresaqui\" pnpm vitest run tests/integration/test-auth.test.ts)"
+      "Bash(SESSION_SECRET=\"supersecretodealmenos32caracteresaqui\" pnpm vitest run tests/integration/test-auth.test.ts)",
+      "Bash(SESSION_SECRET=\"supersecretodealmenos32caracteresaqui\" pnpm vitest run tests/unit/services/tiled-features.parser.test.ts)",
+      "Bash(pnpm format *)",
+      "Bash(pnpm format:check)"
     ],
     "deny": [
       "Read(.env)",

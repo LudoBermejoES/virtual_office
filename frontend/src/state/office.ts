@@ -1,4 +1,7 @@
 import { createStore } from "zustand/vanilla";
+import type { OfficeFeaturesPayload } from "@virtual-office/shared";
+
+export type { OfficeFeaturesPayload };
 
 export interface Desk {
   id: number;
@@ -33,6 +36,7 @@ export interface OfficeDetail {
   desks: Desk[];
   bookings: BookingDto[];
   date: string;
+  features: OfficeFeaturesPayload;
 }
 
 export interface OfficeStore {

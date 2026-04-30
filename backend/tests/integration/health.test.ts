@@ -1,13 +1,16 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { buildServer } from "../../src/http/server.js";
 import { setupTestDb } from "../support/db.js";
+import { parseEnv } from "../../src/config/env.js";
+
+const testEnv = parseEnv({ SESSION_SECRET: "supersecretodealmenos32caracteresaqui", TEIMAS_DOMAINS: "teimas.com", ADMIN_EMAILS: "alice@teimas.com" });
 
 describe("GET /healthz", () => {
   let server: Awaited<ReturnType<typeof buildServer>>;
   const { db, cleanup } = setupTestDb();
 
   beforeAll(async () => {
-    server = await buildServer({ db });
+    server = await buildServer({ db, env: testEnv });
     await server.ready();
   });
 
@@ -28,6 +31,7 @@ describe("GET /healthz", () => {
 
   it("devuelve 503 cuando la DB falla", async () => {
     const brokenServer = await buildServer({
+      env: testEnv,
       prepare: () => {
         throw new Error("DB error simulado");
       },

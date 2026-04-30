@@ -1,6 +1,7 @@
 import * as Phaser from "phaser";
 import { BASE_URL } from "../config.js";
 import { drawDesk } from "../render/desk-renderer.js";
+import { drawZone, drawLabel, findZoneAt } from "../render/zone-renderer.js";
 import { placeAvatar, placeFallback } from "../render/avatar-mask.js";
 import type { AvatarVisual } from "../render/avatar-mask.js";
 import { deskState } from "../domain/desk-state.js";
@@ -18,6 +19,8 @@ export class OfficeScene extends Phaser.Scene {
   private avatarStatus: Map<number, "loading" | "ready"> = new Map();
   private tooltipEl: HTMLDivElement | null = null;
   private feedbackText: Phaser.GameObjects.Text | null = null;
+  private zoneText: Phaser.GameObjects.Text | null = null;
+  private zoneGraphics: Phaser.GameObjects.Graphics | null = null;
   private wsHandle: ConnectHandle | null = null;
   private bufferedMessages: WsServerMessage[] = [];
   private snapshotReady = true;
@@ -66,6 +69,8 @@ export class OfficeScene extends Phaser.Scene {
     }
     for (const layer of map.layers) map.createLayer(layer.name, tilesetObjs);
 
+    this.zoneGraphics = this.add.graphics();
+    this.renderZones();
     this.renderDesks();
 
     this.feedbackText = this.add
@@ -75,6 +80,20 @@ export class OfficeScene extends Phaser.Scene {
         color: "#ffd166",
       })
       .setScrollFactor(0);
+
+    this.zoneText = this.add
+      .text(8, height - 44, "", {
+        fontFamily: "VT323",
+        fontSize: "16px",
+        color: "#8e92a8",
+      })
+      .setScrollFactor(0);
+
+    this.input.on("pointermove", (pointer: Phaser.Input.Pointer) => {
+      if (!this.detail?.features) return;
+      const zone = findZoneAt(pointer.worldX, pointer.worldY, this.detail.features.zones);
+      this.zoneText?.setText(zone ? zone.name : "");
+    });
 
     this.connectRealtime();
 
@@ -90,6 +109,20 @@ export class OfficeScene extends Phaser.Scene {
       this.wsHandle?.close();
       this.wsHandle = null;
     });
+  }
+
+  private renderZones(): void {
+    if (!this.detail?.features || !this.zoneGraphics) return;
+    this.zoneGraphics.clear();
+    for (const zone of this.detail.features.zones) {
+      drawZone(this.zoneGraphics, zone);
+    }
+    for (const room of this.detail.features.rooms) {
+      drawZone(this.zoneGraphics, room);
+    }
+    for (const label of this.detail.features.labels) {
+      drawLabel(this, label);
+    }
   }
 
   private connectRealtime(): void {

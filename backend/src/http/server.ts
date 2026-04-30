@@ -4,7 +4,6 @@ import rateLimit from "@fastify/rate-limit";
 import multipart from "@fastify/multipart";
 import websocket from "@fastify/websocket";
 import type { DatabaseSync } from "node:sqlite";
-import { env as defaultEnv } from "../config/env.js";
 import type { Env } from "../config/env.js";
 import { errorHandler } from "./plugins/error-handler.js";
 import { authGuard } from "./plugins/auth-guard.js";
@@ -23,17 +22,11 @@ import type { GoogleVerifier } from "../infra/auth/google-verifier.js";
 export interface ServerDeps {
   db: DatabaseSync;
   googleVerifier?: GoogleVerifier;
-  env?: Env;
+  env: Env;
   hub?: WsHub;
 }
 
-export async function buildServer({
-  db,
-  googleVerifier,
-  env: envOverride,
-  hub: hubOverride,
-}: ServerDeps) {
-  const env = envOverride ?? defaultEnv;
+export async function buildServer({ db, googleVerifier, env, hub: hubOverride }: ServerDeps) {
   const hub = hubOverride ?? new WsHub();
   const app = Fastify({
     logger: false,
@@ -79,5 +72,3 @@ export async function buildServer({
 
   return app;
 }
-
-export { defaultEnv as env };

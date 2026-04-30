@@ -9,9 +9,11 @@ import * as officesRepo from "../../infra/repos/offices.js";
 import * as desksRepo from "../../infra/repos/desks.js";
 import * as bookingsRepo from "../../infra/repos/bookings.js";
 import * as fixedRepo from "../../infra/repos/fixed-assignments.js";
+import * as featuresRepo from "../../infra/repos/features.js";
 import { officeRoom } from "../../infra/ws/hub.js";
 import type { WsHub } from "../../infra/ws/hub.js";
 import { importDesksFromTiled } from "./desks.js";
+import { parseTiledFeatures } from "../../services/tiled-features.parser.js";
 import { parseIsoDate, todayIso } from "../../domain/bookings.js";
 import { logger } from "../../config/logger.js";
 import type { Env } from "../../config/env.js";
@@ -197,6 +199,14 @@ export async function officesRoutes(
 
     const importResult = importDesksFromTiled(db, office.id, env.OFFICE_MAPS_DIR);
 
+    const tmjJson = JSON.parse(partsResult.parts.tmj!.buffer.toString("utf-8")) as Record<
+      string,
+      unknown
+    >;
+    const features = parseTiledFeatures(tmjJson);
+    featuresRepo.deleteFeatures(db, office.id);
+    featuresRepo.insertFeatures(db, office.id, features);
+
     const finalOffice = officesRepo.findOfficeById(db, office.id)!;
     return reply.status(201).send({
       office: { ...finalOffice, tilesets },
@@ -255,6 +265,14 @@ export async function officesRoutes(
       map_height: cells_y * tile_height,
     });
     const tilesets = officesRepo.replaceTilesets(db, officeId, saved.tilesets);
+
+    const tmjJson = JSON.parse(partsResult.parts.tmj!.buffer.toString("utf-8")) as Record<
+      string,
+      unknown
+    >;
+    const features = parseTiledFeatures(tmjJson);
+    featuresRepo.deleteFeatures(db, officeId);
+    featuresRepo.insertFeatures(db, officeId, features);
 
     hub.broadcast(officeRoom(officeId), { type: "office.updated", officeId });
 
@@ -321,7 +339,9 @@ export async function officesRoutes(
       });
     }
 
-    return reply.status(200).send({ office, tilesets, desks, bookings, date });
+    const features = featuresRepo.listFeatures(db, officeId);
+
+    return reply.status(200).send({ office, tilesets, desks, bookings, date, features });
   });
 
   app.delete("/api/offices/:id", { preHandler: app.requireAdmin }, async (request, reply) => {
