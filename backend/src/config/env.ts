@@ -24,6 +24,8 @@ const envSchema = z.object({
 
   SENTRY_DSN: z.string().optional().default(""),
 
+  TEST_AUTH: z.enum(["on", "off"]).default("off"),
+
   OFFICE_MAPS_DIR: z.string().default("./data/maps"),
   MAX_TMJ_BYTES: z.coerce.number().int().positive().default(1_048_576),
   MAX_TILESET_BYTES: z.coerce.number().int().positive().default(2_097_152),

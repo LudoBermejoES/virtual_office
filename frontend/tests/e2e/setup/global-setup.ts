@@ -29,6 +29,7 @@ export default async function globalSetup() {
         GOOGLE_CLIENT_ID: "",
         GOOGLE_CLIENT_SECRET: "",
         ADMIN_EMAILS: "",
+        TEST_AUTH: "on",
       },
       stdio: "pipe",
     });

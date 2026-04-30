@@ -246,6 +246,49 @@ test("usuario reserva un puesto y otro lo ve ocupado en tiempo real", async ({ b
 
 Los `storageState` se pre-generan en `tests/e2e/setup/seed-users.ts` simulando el callback de Google con tokens fake firmados por una clave de test.
 
+### Helpers de sesión para flujos e2e (change 013)
+
+El backend expone `POST /api/test/session` cuando arranca con `TEST_AUTH=on` (nunca en `NODE_ENV=production`). Los flujos e2e usan este endpoint en lugar de Google OAuth real.
+
+#### `loginAs(request, context, user)` — `tests/e2e/support/auth.ts`
+
+```ts
+await loginAs(request, context, { email: "alice@example.com", role: "admin" });
+// → llama a POST /api/test/session, parsea Set-Cookie y lo inyecta en el context
+```
+
+#### `setupTestOffice(request, deskDefs?)` — `tests/e2e/support/office.ts`
+
+```ts
+const { officeId, desks } = await setupTestOffice(request);
+// → crea oficina mínima + N desks vía API, devuelve handles
+```
+
+#### Correr los flujos en local
+
+```bash
+# 1. Compilar backend
+cd backend && pnpm build
+
+# 2. Arrancar backend con TEST_AUTH
+SESSION_SECRET="local-secret-al-menos-32-caracteres!" \
+TEST_AUTH=on NODE_ENV=test PORT=18081 node dist/server.js &
+
+# 3. Correr flujos e2e (solo Chromium)
+cd frontend && PLAYWRIGHT_BASE_URL=http://localhost:18081 pnpm e2e:chromium
+
+# 4. Ver informe
+pnpm exec playwright show-report
+```
+
+Los flujos están en `tests/e2e/flows/`:
+
+- `booking-flow.spec.ts` — reservar, verificar persistencia, liberar
+- `realtime-flow.spec.ts` — Alice reserva, Bob consulta snapshot actualizado
+- `fixed-flow.spec.ts` — admin asigna fijo, miembro recibe 403
+- `invitation-flow.spec.ts` — admin crea invitación, token válido
+- `day-navigation-flow.spec.ts` — reserva en +1, no aparece hoy, sí en +1
+
 ---
 
 ## CI

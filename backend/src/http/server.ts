@@ -16,6 +16,7 @@ import { desksRoutes } from "./routes/desks.js";
 import { bookingsRoutes } from "./routes/bookings.js";
 import { fixedAssignmentsRoutes } from "./routes/fixed-assignments.js";
 import { occupancyWsRoutes } from "./ws/occupancy.js";
+import { testAuthRoutes } from "./routes/test-auth.js";
 import { WsHub } from "../infra/ws/hub.js";
 import type { GoogleVerifier } from "../infra/auth/google-verifier.js";
 
@@ -60,6 +61,13 @@ export async function buildServer({
   await app.register(bookingsRoutes, { db, env, hub });
   await app.register(fixedAssignmentsRoutes, { db, env, hub });
   await app.register(occupancyWsRoutes, { db, env, hub });
+
+  if (env.TEST_AUTH === "on") {
+    if (env.NODE_ENV === "production") {
+      throw new Error("FATAL: TEST_AUTH=on no puede usarse con NODE_ENV=production");
+    }
+    await app.register(testAuthRoutes, { prefix: "/api/test", db, env });
+  }
 
   app.addContentTypeParser("application/json", { parseAs: "string" }, (_, body, done) => {
     try {
