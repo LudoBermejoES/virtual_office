@@ -1,6 +1,8 @@
 import * as Phaser from "phaser";
 import { BASE_URL } from "../config.js";
 import { drawDesk } from "../render/desk-renderer.js";
+import { placeAvatar, placeFallback } from "../render/avatar-mask.js";
+import type { AvatarVisual } from "../render/avatar-mask.js";
 import { deskState } from "../domain/desk-state.js";
 import { connectOffice } from "../realtime/socket.js";
 import { uiStore, shouldApply } from "../state/ui.js";
@@ -12,6 +14,9 @@ export class OfficeScene extends Phaser.Scene {
   private detail: OfficeDetail | null = null;
   private meId: number = 0;
   private deskRects: Map<number, Phaser.GameObjects.Rectangle> = new Map();
+  private deskAvatars: Map<number, AvatarVisual> = new Map();
+  private avatarStatus: Map<number, "loading" | "ready"> = new Map();
+  private tooltipEl: HTMLDivElement | null = null;
   private feedbackText: Phaser.GameObjects.Text | null = null;
   private wsHandle: ConnectHandle | null = null;
   private bufferedMessages: WsServerMessage[] = [];
@@ -150,18 +155,104 @@ export class OfficeScene extends Phaser.Scene {
   private rerenderDesks(): void {
     for (const rect of this.deskRects.values()) rect.destroy();
     this.deskRects.clear();
+    for (const visual of this.deskAvatars.values()) visual.destroy();
+    this.deskAvatars.clear();
     this.renderDesks();
   }
 
   private renderDesks(): void {
     if (!this.detail) return;
+    if (!this.tooltipEl) this.mountTooltip();
     for (const desk of this.detail.desks) {
       const state = deskState(desk, this.detail.bookings, this.meId);
       const rect = drawDesk(this, desk, state);
       rect.setInteractive();
       rect.on("pointerdown", () => void this.handleDeskClick(desk));
       this.deskRects.set(desk.id, rect);
+
+      const booking = this.detail.bookings.find((b) => b.deskId === desk.id);
+      if (booking) {
+        this.renderAvatarFor(desk, booking.user);
+        rect.on("pointerover", (pointer: Phaser.Input.Pointer) => {
+          this.showTooltip(booking.user.name, pointer.x, pointer.y);
+        });
+        rect.on("pointerout", () => this.hideTooltip());
+      }
     }
+  }
+
+  private renderAvatarFor(
+    desk: Desk,
+    user: { id: number; name: string; avatar_url: string | null },
+  ): void {
+    if (!user.avatar_url) {
+      const visual = placeFallback(this, desk.x, desk.y, user);
+      this.deskAvatars.set(desk.id, visual);
+      return;
+    }
+    const key = `avatar:${user.id}`;
+    if (this.textures.exists(key)) {
+      const visual = placeAvatar(this, key, desk.x, desk.y);
+      this.deskAvatars.set(desk.id, visual);
+      return;
+    }
+    if (this.avatarStatus.get(user.id) === "loading") {
+      const fb = placeFallback(this, desk.x, desk.y, user);
+      this.deskAvatars.set(desk.id, fb);
+      return;
+    }
+    const fallback = placeFallback(this, desk.x, desk.y, user);
+    this.deskAvatars.set(desk.id, fallback);
+    this.avatarStatus.set(user.id, "loading");
+    this.load.image(key, user.avatar_url);
+    this.load.once(`filecomplete-image-${key}`, () => {
+      this.avatarStatus.set(user.id, "ready");
+      const cur = this.deskAvatars.get(desk.id);
+      if (cur) cur.destroy();
+      const visual = placeAvatar(this, key, desk.x, desk.y);
+      this.deskAvatars.set(desk.id, visual);
+    });
+    this.load.once("loaderror", () => {
+      this.avatarStatus.delete(user.id);
+    });
+    this.load.start();
+  }
+
+  private mountTooltip(): void {
+    if (typeof document === "undefined") return;
+    const el = document.createElement("div");
+    el.id = "tooltip";
+    Object.assign(el.style, {
+      position: "fixed",
+      pointerEvents: "none",
+      padding: "4px 8px",
+      backgroundColor: "rgba(0, 0, 0, 0.85)",
+      color: "#ffffff",
+      fontFamily: '"VT323", monospace',
+      fontSize: "16px",
+      borderRadius: "4px",
+      display: "none",
+      zIndex: "1000",
+    });
+    document.body.appendChild(el);
+    this.tooltipEl = el;
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") this.hideTooltip();
+    });
+  }
+
+  private showTooltip(text: string, x: number, y: number): void {
+    if (!this.tooltipEl) return;
+    this.tooltipEl.textContent = text;
+    this.tooltipEl.style.display = "block";
+    this.tooltipEl.style.left = `${x + 8}px`;
+    this.tooltipEl.style.top = `${y - 30}px`;
+  }
+
+  private hideTooltip(): void {
+    if (!this.tooltipEl) return;
+    this.tooltipEl.style.display = "none";
   }
 
   private async handleDeskClick(desk: Desk): Promise<void> {
@@ -253,9 +344,7 @@ export class OfficeScene extends Phaser.Scene {
     const fresh = (await res.json()) as OfficeDetail;
     this.detail = fresh;
 
-    for (const rect of this.deskRects.values()) rect.destroy();
-    this.deskRects.clear();
-    this.renderDesks();
+    this.rerenderDesks();
   }
 
   private showFeedback(message: string): void {
