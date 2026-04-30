@@ -16,7 +16,7 @@ El sistema MUST exponer `GET /readyz` público que verifica que la base de datos
 - THEN la respuesta es 503 con `{ status: "degraded", reason: "db_down" }`
 
 #### Scenario: Migración faltante
-- GIVEN el servidor arrancado con DB accesible pero falta una migración
+- GIVEN el servidor arrancado con DB accesible pero falta una migración en `_migrations`
 - WHEN se solicita `GET /readyz`
 - THEN la respuesta es 503 con `{ status: "degraded", reason: "migrations_pending", missing: ["0007_..."] }`
 
@@ -41,6 +41,7 @@ El sistema MUST exponer `GET /metrics` en formato Prometheus text con las métri
 
 ### Requirement: Métricas mínimas exportadas
 El sistema MUST exportar al menos las siguientes métricas en `/metrics`:
+
 - `vo_http_requests_total{method,route,status}` (counter)
 - `vo_http_request_duration_seconds{method,route}` (histogram)
 - `vo_ws_connections_active{office_id}` (gauge)
@@ -58,18 +59,19 @@ El sistema MUST exportar al menos las siguientes métricas en `/metrics`:
 - THEN `vo_ws_connections_active{office_id="1"}` pasa de 0 a 1
 - AND vuelve a 0 al cerrar la conexión
 
-### Requirement: Backups automáticos versionados
-El sistema MUST proveer el script `backend/scripts/backup-db.sh` que produce un snapshot consistente (`VACUUM INTO`) comprimido (`gzip`) en el directorio configurable `VO_BACKUP_DIR`. El script MUST aplicar `chmod 600` al fichero resultante. El sistema MUST documentar la política de retención (30 días + último de cada mes) y la cron entry recomendada.
+### Requirement: Backups automáticos integrados en el servidor
+El sistema MUST ejecutar un backup nocturno de la base de datos SQLite directamente desde el proceso Node.js, sin scripts externos ni cron del sistema operativo. El backup MUST usar `VACUUM INTO` para un snapshot consistente, comprimirse con `node:zlib` (gzip) y almacenarse con permisos `600`. El scheduler MUST arrancar automáticamente con el servidor y ser configurable mediante variables de entorno.
 
-#### Scenario: Backup correcto
-- GIVEN una DB con datos y el directorio `VO_BACKUP_DIR=/tmp/vo-backups` existente
-- WHEN se ejecuta `backup-db.sh`
+#### Scenario: Backup nocturno produce fichero válido
+- GIVEN el servidor arrancado con `VO_BACKUP_DIR=/tmp/vo-backups`
+- WHEN el scheduler ejecuta `runBackup`
 - THEN existe un fichero `/tmp/vo-backups/YYYY-MM-DD-HHmm.db.gz`
 - AND el fichero tiene permisos `600`
-- AND `gunzip -c` del fichero produce una DB SQLite válida con los mismos datos
+- AND descomprimirlo con `node:zlib` produce una DB SQLite con los mismos datos
 
-#### Scenario: Restore documentado
-- GIVEN un backup `2026-05-01-0300.db.gz`
-- WHEN un operador sigue el procedimiento documentado en `doc/be/OPERATIONS.md`
-- THEN la DB se restaura completamente
-- AND el sistema reanuda operación con los datos de ese momento
+#### Scenario: Retención elimina backups antiguos
+- GIVEN existen backups de más de 30 días que no son el último del mes
+- WHEN se ejecuta la política de retención
+- THEN esos ficheros son eliminados
+- AND se conservan los ficheros de los últimos 30 días
+- AND se conserva el último fichero de cada mes anterior

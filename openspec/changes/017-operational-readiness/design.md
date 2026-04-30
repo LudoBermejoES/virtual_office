@@ -1,83 +1,175 @@
 # Diseño técnico: operational readiness
 
-## Backups
+## A. Backups automáticos (Node.js, integrado en el servidor)
 
-`backend/scripts/backup-db.sh` (bash, sin dependencias):
+### Scheduler
 
-```bash
-#!/usr/bin/env bash
-set -euo pipefail
-DB="${VO_DB_PATH:-./data/virtual-office.db}"
-DEST="${VO_BACKUP_DIR:-./backups}"
-mkdir -p "$DEST"
-TS=$(date -u +"%Y-%m-%d-%H%M")
-TARGET="$DEST/$TS.db.gz"
+`node-cron` integrado en `backend/src/server.ts` (o en un módulo `infra/backup/scheduler.ts`
+llamado desde el arranque). Configurable con `VO_BACKUP_CRON` (default `"0 3 * * *"`).
 
-# SQLite en modo WAL: usar VACUUM INTO para snapshot consistente
-sqlite3 "$DB" "VACUUM INTO '$DEST/$TS.db.tmp'"
-gzip -9 "$DEST/$TS.db.tmp"
-mv "$DEST/$TS.db.tmp.gz" "$TARGET"
-chmod 600 "$TARGET"
+```ts
+import cron from "node-cron";
+import { runBackup } from "./infra/backup/backup.js";
 
-# Rotación: últimos 30 días + último de cada mes
-find "$DEST" -name "*.db.gz" -mtime +30 -print0 | \
-  xargs -0 -I{} bash -c '... lógica de retención ...'
+export function startBackupScheduler(db: DatabaseSync, env: Env): void {
+  cron.schedule(env.VO_BACKUP_CRON ?? "0 3 * * *", () => {
+    runBackup(db, env).catch((err) =>
+      logger.error("backup.failed", { error: err }),
+    );
+  });
+}
 ```
 
-Cron entry documentada (no instalada por el script):
+### Lógica de backup (`backend/src/infra/backup/backup.ts`)
+
+Sin bash. Solo `node:sqlite`, `node:fs`, `node:zlib`, `node:path`:
+
+```ts
+import { createReadStream, createWriteStream, chmodSync, mkdirSync } from "node:fs";
+import { createGzip } from "node:zlib";
+import { pipeline } from "node:stream/promises";
+import type { DatabaseSync } from "node:sqlite";
+
+export async function runBackup(db: DatabaseSync, env: Env): Promise<string> {
+  const backupDir = env.VO_BACKUP_DIR ?? "./backups";
+  mkdirSync(backupDir, { recursive: true });
+
+  const ts = new Date().toISOString().slice(0, 16).replace("T", "-").replace(":", "");
+  const tmpPath = join(backupDir, `${ts}.db.tmp`);
+  const gzPath  = join(backupDir, `${ts}.db.gz`);
+
+  // Snapshot consistente vía VACUUM INTO (no bloquea readers, snapshot atómico)
+  db.exec(`VACUUM INTO '${tmpPath}'`);
+
+  // Comprimir con node:zlib sin dependencias externas
+  await pipeline(createReadStream(tmpPath), createGzip(), createWriteStream(gzPath));
+  rmSync(tmpPath);
+  chmodSync(gzPath, 0o600);
+
+  await applyRetentionPolicy(backupDir);
+  return gzPath;
+}
+```
+
+### Política de retención (TypeScript puro)
+
+- Mantener todos los ficheros de los **últimos 30 días**.
+- Mantener el **último fichero de cada mes** anterior (el más reciente del mes).
+- Eliminar el resto con `fs.rmSync`.
+
+Implementada en `backend/src/infra/backup/retention.ts`, testeable sin disco (recibe lista de nombres y fecha de referencia, devuelve cuáles borrar).
+
+### Variables de entorno nuevas
 
 ```
-0 3 * * * /opt/virtual-office/backend/scripts/backup-db.sh >> /var/log/vo-backup.log 2>&1
+VO_BACKUP_DIR=./backups          # directorio de backups
+VO_BACKUP_CRON="0 3 * * *"      # expresión cron del scheduler (opcional)
 ```
 
 ### Restore
 
-Documentado en `doc/be/OPERATIONS.md`:
+Documentado en `doc/be/OPERATIONS.md`. Sin comandos bash complejos:
 
 ```bash
+# 1. Parar el servidor (PM2 o proceso directo)
 pm2 stop virtual-office-api
-gunzip -c backups/2026-05-01-0300.db.gz > data/virtual-office.db
+
+# 2. Descomprimir el backup elegido (node, gunzip, o cualquier herramienta)
+node -e "
+  const {createReadStream,createWriteStream} = require('fs');
+  const {createGunzip} = require('zlib');
+  const {pipeline} = require('stream/promises');
+  pipeline(createReadStream('backups/2026-05-01-0300.db.gz'), createGunzip(), createWriteStream('data/virtual-office.db'))
+    .then(() => console.log('Restore OK'));
+"
+
+# 3. Arrancar el servidor
 pm2 start virtual-office-api
 ```
 
-## /metrics
+---
 
-Plugin Fastify `backend/src/http/plugins/metrics.ts` usando `prom-client`:
+## B. /metrics
+
+Plugin Fastify `backend/src/http/plugins/metrics.ts` con `prom-client`:
 
 ```ts
 import client from "prom-client";
+import fp from "fastify-plugin";
 
 export const httpRequestsTotal = new client.Counter({
   name: "vo_http_requests_total",
-  help: "Total HTTP requests",
   labelNames: ["method", "route", "status"],
-});
-// ... resto
-
-app.addHook("onResponse", async (req, reply) => {
-  httpRequestsTotal.inc({
-    method: req.method,
-    route: req.routeOptions.url ?? "unknown",
-    status: reply.statusCode,
-  });
+  help: "Total HTTP requests",
 });
 
+export const httpDuration = new client.Histogram({
+  name: "vo_http_request_duration_seconds",
+  labelNames: ["method", "route"],
+  help: "HTTP request duration",
+  buckets: [0.005, 0.01, 0.05, 0.1, 0.5, 1, 5],
+});
+
+export const wsConnectionsActive = new client.Gauge({
+  name: "vo_ws_connections_active",
+  labelNames: ["office_id"],
+  help: "Active WebSocket connections per office",
+});
+
+export const wsMessagesSent = new client.Counter({
+  name: "vo_ws_messages_sent_total",
+  labelNames: ["type"],
+  help: "Total WebSocket messages sent",
+});
+
+export const uptimeGauge = new client.Gauge({
+  name: "vo_uptime_seconds",
+  help: "Server uptime in seconds",
+  collect() { this.set(process.uptime()); },
+});
+```
+
+Hook `onResponse`:
+
+```ts
+app.addHook("onResponse", (req, reply, done) => {
+  const route = req.routeOptions?.url ?? "unknown";
+  httpRequestsTotal.inc({ method: req.method, route, status: String(reply.statusCode) });
+  httpDuration.observe({ method: req.method, route }, reply.elapsedTime / 1000);
+  done();
+});
+```
+
+Endpoint:
+
+```ts
 app.get("/metrics", async (req, reply) => {
-  if (!await checkBasicAuth(req)) {
-    reply.code(401).header("WWW-Authenticate", 'Basic realm="metrics"').send();
-    return;
+  if (!env.BASIC_AUTH_METRICS_USER || !env.BASIC_AUTH_METRICS_PASS) {
+    return reply.code(503).send({ reason: "metrics_not_configured" });
+  }
+  const auth = req.headers["authorization"] ?? "";
+  const expected = "Basic " + Buffer.from(
+    `${env.BASIC_AUTH_METRICS_USER}:${env.BASIC_AUTH_METRICS_PASS}`
+  ).toString("base64");
+  if (auth !== expected) {
+    return reply.code(401).header("WWW-Authenticate", 'Basic realm="metrics"').send();
   }
   reply.header("Content-Type", client.register.contentType);
   return client.register.metrics();
 });
 ```
 
-`checkBasicAuth(req)` lee `Authorization: Basic <base64(user:pass)>` y compara con `env.BASIC_AUTH_METRICS_USER` / `PASS`. Si las env vars no están seteadas, devuelve 503 inmediato.
+`WsHub` incrementa/decrementa `wsConnectionsActive` al conectar/desconectar, e incrementa
+`wsMessagesSent` al hacer broadcast.
 
-## /readyz
+---
+
+## C. /readyz
+
+En `backend/src/http/routes/health.ts` (junto al `/healthz` existente):
 
 ```ts
-app.get("/readyz", async (req, reply) => {
+app.get("/readyz", async (_req, reply) => {
   // 1. DB ping
   try {
     db.prepare("SELECT 1").get();
@@ -85,92 +177,59 @@ app.get("/readyz", async (req, reply) => {
     return reply.code(503).send({ status: "degraded", reason: "db_down" });
   }
   // 2. Migraciones up-to-date
-  const applied = db.prepare("SELECT version FROM _migrations").all().map(r => r.version);
-  const expected = listExpectedMigrations(); // de un manifest
-  const missing = expected.filter(v => !applied.includes(v));
+  const applied = new Set(
+    (db.prepare("SELECT version FROM _migrations").all() as { version: number }[])
+      .map((r) => r.version),
+  );
+  const missing = EXPECTED_MIGRATIONS.filter((v) => !applied.has(v));
   if (missing.length > 0) {
     return reply.code(503).send({ status: "degraded", reason: "migrations_pending", missing });
   }
-  return { status: "ready" };
+  return reply.send({ status: "ready" });
 });
 ```
 
-## PM2
+`EXPECTED_MIGRATIONS` es un array constante en código derivado de los ficheros `.sql` en
+`src/infra/db/migrations/` — se genera en tiempo de build o se mantiene a mano como manifest
+junto a cada nueva migración.
 
-`backend/ecosystem.config.cjs`:
+---
 
-```js
-module.exports = {
-  apps: [{
-    name: "virtual-office-api",
-    script: "./dist/main.js",
-    cwd: "/opt/virtual-office/backend",
-    instances: 1,
-    exec_mode: "fork",
-    env: { NODE_ENV: "production" },
-    error_file: "./logs/pm2-error.log",
-    out_file: "./logs/pm2-out.log",
-    merge_logs: true,
-    max_memory_restart: "512M",
-    kill_timeout: 5000,
-  }],
-};
-```
+## D. Sentry release tracking
 
-`pm2-logrotate` instalado y configurado:
-
-```bash
-pm2 install pm2-logrotate
-pm2 set pm2-logrotate:max_size 10M
-pm2 set pm2-logrotate:retain 7
-pm2 set pm2-logrotate:compress true
-```
-
-## Deploy script
-
-`scripts/deploy.sh`:
-
-```bash
-#!/usr/bin/env bash
-set -euo pipefail
-cd /opt/virtual-office
-git fetch origin main
-git reset --hard origin/main
-pnpm install --frozen-lockfile
-pnpm --filter backend build
-GIT_SHA=$(git rev-parse HEAD)
-export GIT_SHA
-pm2 reload virtual-office-api --update-env
-sleep 2
-curl -fs http://localhost:18081/readyz || (echo "Readiness check failed" && exit 1)
-echo "Deploy OK: $GIT_SHA"
-```
-
-## Sentry release
+En `backend/src/infra/observability/sentry.ts`:
 
 ```ts
 if (env.SENTRY_DSN) {
-  Sentry.init({ dsn: env.SENTRY_DSN, release: env.GIT_SHA });
-  Sentry.setTag("release", env.GIT_SHA);
+  Sentry.init({
+    dsn: env.SENTRY_DSN,
+    ...(env.GIT_SHA ? { release: env.GIT_SHA } : {}),
+  });
+  if (env.GIT_SHA) Sentry.setTag("release", env.GIT_SHA);
 }
 ```
 
-## Variables nuevas
+`GIT_SHA` añadido como `z.string().optional()` en `env.ts`.
 
-`.env.production.example` añade:
+---
+
+## Variables nuevas en `.env.production.example`
 
 ```
 BASIC_AUTH_METRICS_USER=metrics
 BASIC_AUTH_METRICS_PASS=changeme
 GIT_SHA=
-VO_BACKUP_DIR=/opt/virtual-office/backups
+VO_BACKUP_DIR=./backups
+VO_BACKUP_CRON="0 3 * * *"
 ```
+
+---
 
 ## Riesgos
 
 | Riesgo | Mitigación |
 |--------|------------|
-| `/metrics` expuesto sin auth | Devolver 503 si las env vars faltan + test que lo verifica |
-| Backups sin disk space → falla silenciosa | Cron logs a fichero + alerta si tamaño no crece |
-| `pm2 reload` con DB en mitad de una migración | El script aplica migraciones antes del reload, no después |
-| `VACUUM INTO` bloquea writes durante varios segundos | Aceptable a las 3 AM; documentar en OPERATIONS.md |
+| `/metrics` expuesto sin auth | Devuelve 503 si env vars faltan; test explícito |
+| `VACUUM INTO` tarda varios segundos con DB grande | Aceptable a las 3 AM; error capturado y logueado |
+| Disco lleno durante backup | `runBackup` propaga el error; scheduler lo loguea; `tmpPath` se limpia en `finally` |
+| Retención borra demasiado | Lógica testeada con fechas sintéticas antes de tocar disco |
