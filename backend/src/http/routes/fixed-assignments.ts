@@ -4,11 +4,13 @@ import { z } from "zod";
 import * as fixedRepo from "../../infra/repos/fixed-assignments.js";
 import * as desksRepo from "../../infra/repos/desks.js";
 import { findUserById } from "../../infra/repos/users.js";
+import { officeRoom } from "../../infra/ws/hub.js";
+import type { WsHub } from "../../infra/ws/hub.js";
 import type { Env } from "../../config/env.js";
 
 export async function fixedAssignmentsRoutes(
   app: FastifyInstance,
-  { db }: { db: DatabaseSync; env: Env },
+  { db, hub }: { db: DatabaseSync; env: Env; hub: WsHub },
 ): Promise<void> {
   app.post("/api/desks/:id/fixed", { preHandler: app.requireAdmin }, async (request, reply) => {
     const params = z.object({ id: z.coerce.number().int().positive() }).safeParse(request.params);
@@ -29,6 +31,11 @@ export async function fixedAssignmentsRoutes(
         user_id: user.id,
         assigned_by_user_id: request.user!.id,
       });
+      hub.broadcast(officeRoom(desk.office_id), {
+        type: "desk.fixed",
+        deskId: desk.id,
+        user: { id: user.id, name: user.name, avatar_url: user.avatar_url },
+      });
       return reply.status(201).send({ fixed });
     } catch (e) {
       if (e instanceof fixedRepo.FixedAssignmentConflict) {
@@ -47,6 +54,14 @@ export async function fixedAssignmentsRoutes(
 
     const removed = fixedRepo.deleteFixedAssignmentByDesk(db, params.data.id);
     if (!removed) return reply.status(404).send({ reason: "not_found" });
+
+    const desk = desksRepo.findDeskById(db, params.data.id);
+    if (desk) {
+      hub.broadcast(officeRoom(desk.office_id), {
+        type: "desk.unfixed",
+        deskId: desk.id,
+      });
+    }
     return reply.status(204).send();
   });
 }

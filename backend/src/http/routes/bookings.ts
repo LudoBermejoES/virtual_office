@@ -4,13 +4,16 @@ import { z } from "zod";
 import * as bookingsRepo from "../../infra/repos/bookings.js";
 import * as desksRepo from "../../infra/repos/desks.js";
 import * as fixedRepo from "../../infra/repos/fixed-assignments.js";
+import { findUserById } from "../../infra/repos/users.js";
 import { isInWindow, parseIsoDate, todayIso } from "../../domain/bookings.js";
 import { UniqueViolation } from "../../infra/repos/bookings.js";
+import { officeRoom } from "../../infra/ws/hub.js";
+import type { WsHub } from "../../infra/ws/hub.js";
 import type { Env } from "../../config/env.js";
 
 export async function bookingsRoutes(
   app: FastifyInstance,
-  { db, env }: { db: DatabaseSync; env: Env },
+  { db, env, hub }: { db: DatabaseSync; env: Env; hub: WsHub },
 ): Promise<void> {
   app.post("/api/desks/:id/bookings", { preHandler: app.requireAuth }, async (request, reply) => {
     const params = z.object({ id: z.coerce.number().int().positive() }).safeParse(request.params);
@@ -44,6 +47,15 @@ export async function bookingsRoutes(
         date: parsedDate.date,
         type: "daily",
       });
+      const user = findUserById(db, booking.user_id);
+      if (user) {
+        hub.broadcast(officeRoom(desk.office_id), {
+          type: "desk.booked",
+          deskId: desk.id,
+          date: booking.date,
+          user: { id: user.id, name: user.name, avatar_url: user.avatar_url },
+        });
+      }
       return reply.status(201).send({ booking });
     } catch (e) {
       if (e instanceof UniqueViolation) {
@@ -81,6 +93,14 @@ export async function bookingsRoutes(
     }
 
     bookingsRepo.deleteBy(db, { desk_id: params.data.id, date: parsedDate.date });
+    const desk = desksRepo.findDeskById(db, params.data.id);
+    if (desk) {
+      hub.broadcast(officeRoom(desk.office_id), {
+        type: "desk.released",
+        deskId: desk.id,
+        date: parsedDate.date,
+      });
+    }
     return reply.status(204).send();
   });
 }

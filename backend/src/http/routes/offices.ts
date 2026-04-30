@@ -9,6 +9,8 @@ import * as officesRepo from "../../infra/repos/offices.js";
 import * as desksRepo from "../../infra/repos/desks.js";
 import * as bookingsRepo from "../../infra/repos/bookings.js";
 import * as fixedRepo from "../../infra/repos/fixed-assignments.js";
+import { officeRoom } from "../../infra/ws/hub.js";
+import type { WsHub } from "../../infra/ws/hub.js";
 import { importDesksFromTiled } from "./desks.js";
 import { parseIsoDate, todayIso } from "../../domain/bookings.js";
 import { logger } from "../../config/logger.js";
@@ -126,7 +128,7 @@ async function validateBundle(
 
 export async function officesRoutes(
   app: FastifyInstance,
-  { db, env }: { db: DatabaseSync; env: Env },
+  { db, env, hub }: { db: DatabaseSync; env: Env; hub: WsHub },
 ): Promise<void> {
   app.post("/api/offices", { preHandler: app.requireAdmin }, async (request, reply) => {
     if (!request.isMultipart()) {
@@ -253,6 +255,8 @@ export async function officesRoutes(
       map_height: cells_y * tile_height,
     });
     const tilesets = officesRepo.replaceTilesets(db, officeId, saved.tilesets);
+
+    hub.broadcast(officeRoom(officeId), { type: "office.updated", officeId });
 
     const finalOffice = officesRepo.findOfficeById(db, officeId)!;
     return reply.status(200).send({ office: { ...finalOffice, tilesets }, desksImported: 0 });

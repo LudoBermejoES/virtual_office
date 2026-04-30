@@ -2,6 +2,7 @@ import Fastify from "fastify";
 import cookie from "@fastify/cookie";
 import rateLimit from "@fastify/rate-limit";
 import multipart from "@fastify/multipart";
+import websocket from "@fastify/websocket";
 import type { DatabaseSync } from "node:sqlite";
 import { env as defaultEnv } from "../config/env.js";
 import type { Env } from "../config/env.js";
@@ -14,16 +15,25 @@ import { officesRoutes } from "./routes/offices.js";
 import { desksRoutes } from "./routes/desks.js";
 import { bookingsRoutes } from "./routes/bookings.js";
 import { fixedAssignmentsRoutes } from "./routes/fixed-assignments.js";
+import { occupancyWsRoutes } from "./ws/occupancy.js";
+import { WsHub } from "../infra/ws/hub.js";
 import type { GoogleVerifier } from "../infra/auth/google-verifier.js";
 
 export interface ServerDeps {
   db: DatabaseSync;
   googleVerifier?: GoogleVerifier;
   env?: Env;
+  hub?: WsHub;
 }
 
-export async function buildServer({ db, googleVerifier, env: envOverride }: ServerDeps) {
+export async function buildServer({
+  db,
+  googleVerifier,
+  env: envOverride,
+  hub: hubOverride,
+}: ServerDeps) {
   const env = envOverride ?? defaultEnv;
+  const hub = hubOverride ?? new WsHub();
   const app = Fastify({
     logger: false,
     disableRequestLogging: true,
@@ -38,16 +48,18 @@ export async function buildServer({ db, googleVerifier, env: envOverride }: Serv
       files: 10,
     },
   });
+  await app.register(websocket);
   await app.register(errorHandler);
 
   await app.register(healthRoutes, { db });
   await app.register(authRoutes, { db, googleVerifier, env });
   await app.register(authGuard, { db, env });
   await app.register(invitationsRoutes, { db, env });
-  await app.register(officesRoutes, { db, env });
+  await app.register(officesRoutes, { db, env, hub });
   await app.register(desksRoutes, { db, env });
-  await app.register(bookingsRoutes, { db, env });
-  await app.register(fixedAssignmentsRoutes, { db, env });
+  await app.register(bookingsRoutes, { db, env, hub });
+  await app.register(fixedAssignmentsRoutes, { db, env, hub });
+  await app.register(occupancyWsRoutes, { db, env, hub });
 
   app.addContentTypeParser("application/json", { parseAs: "string" }, (_, body, done) => {
     try {

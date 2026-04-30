@@ -2,6 +2,9 @@ import * as Phaser from "phaser";
 import { BASE_URL } from "../config.js";
 import { drawDesk } from "../render/desk-renderer.js";
 import { deskState } from "../domain/desk-state.js";
+import { connectOffice } from "../realtime/socket.js";
+import type { ConnectHandle } from "../realtime/socket.js";
+import type { WsServerMessage } from "@virtual-office/shared";
 import type { Desk, OfficeDetail } from "../state/office.js";
 
 export class OfficeScene extends Phaser.Scene {
@@ -9,6 +12,9 @@ export class OfficeScene extends Phaser.Scene {
   private meId: number = 0;
   private deskRects: Map<number, Phaser.GameObjects.Rectangle> = new Map();
   private feedbackText: Phaser.GameObjects.Text | null = null;
+  private wsHandle: ConnectHandle | null = null;
+  private bufferedMessages: WsServerMessage[] = [];
+  private snapshotReady = true;
 
   constructor() {
     super({ key: "OfficeScene" });
@@ -63,6 +69,78 @@ export class OfficeScene extends Phaser.Scene {
         color: "#ffff00",
       })
       .setScrollFactor(0);
+
+    this.connectRealtime();
+
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.wsHandle?.close();
+      this.wsHandle = null;
+    });
+  }
+
+  private connectRealtime(): void {
+    if (!this.detail) return;
+    this.snapshotReady = true;
+    this.wsHandle = connectOffice({
+      officeId: this.detail.office.id,
+      onMessage: (msg) => {
+        if (!this.snapshotReady) {
+          this.bufferedMessages.push(msg);
+          return;
+        }
+        this.applyDelta(msg);
+      },
+      onClose: (code) => {
+        if (code === 4001) {
+          this.showFeedback("Sesión expirada");
+        }
+      },
+    });
+  }
+
+  private applyDelta(msg: WsServerMessage): void {
+    if (!this.detail) return;
+    if (msg.type === "snapshot.ts") return;
+    if (msg.type === "auth.expired") return;
+    if (msg.type === "office.updated") {
+      void this.refreshSnapshot();
+      return;
+    }
+
+    if (msg.type === "desk.booked" && msg.date === this.detail.date) {
+      this.detail.bookings = this.detail.bookings.filter((b) => b.deskId !== msg.deskId);
+      this.detail.bookings.push({
+        id: -Date.now(),
+        deskId: msg.deskId,
+        userId: msg.user.id,
+        type: "daily",
+        date: msg.date,
+        user: msg.user,
+      });
+    } else if (msg.type === "desk.released" && msg.date === this.detail.date) {
+      this.detail.bookings = this.detail.bookings.filter((b) => b.deskId !== msg.deskId);
+    } else if (msg.type === "desk.fixed") {
+      this.detail.bookings = this.detail.bookings.filter((b) => b.deskId !== msg.deskId);
+      this.detail.bookings.push({
+        id: -Date.now(),
+        deskId: msg.deskId,
+        userId: msg.user.id,
+        type: "fixed",
+        date: this.detail.date,
+        user: msg.user,
+      });
+    } else if (msg.type === "desk.unfixed") {
+      this.detail.bookings = this.detail.bookings.filter((b) => b.deskId !== msg.deskId);
+    } else {
+      return;
+    }
+    this.rerenderDesks();
+  }
+
+  private rerenderDesks(): void {
+    for (const rect of this.deskRects.values()) rect.destroy();
+    this.deskRects.clear();
+    this.renderDesks();
   }
 
   private renderDesks(): void {
