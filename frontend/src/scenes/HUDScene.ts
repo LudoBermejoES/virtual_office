@@ -14,7 +14,6 @@ export class HUDScene extends Phaser.Scene {
   private dateLabel: Phaser.GameObjects.Text | null = null;
   private prevBtn: ArcadeButton | null = null;
   private nextBtn: ArcadeButton | null = null;
-  private todayBtn: ArcadeButton | null = null;
   private muteBtn: Phaser.GameObjects.Text | null = null;
   private selectorEl: HTMLDivElement | null = null;
   adminBtnEl: HTMLButtonElement | null = null;
@@ -32,7 +31,6 @@ export class HUDScene extends Phaser.Scene {
 
     this.prevBtn = arcadeButton(this, width / 2 - 220, 28, "<", () => this.handlePrev());
     this.nextBtn = arcadeButton(this, width / 2 + 220, 28, ">", () => this.handleNext());
-    this.todayBtn = arcadeButton(this, width - 120, 28, "HOY", () => this.handleToday());
 
     this.dateLabel = this.add
       .text(width / 2, 28, "", {
@@ -56,8 +54,8 @@ export class HUDScene extends Phaser.Scene {
 
     this.input.keyboard?.on("keydown-LEFT", () => this.handlePrev());
     this.input.keyboard?.on("keydown-RIGHT", () => this.handleNext());
-    this.input.keyboard?.on("keydown-HOME", () => this.handleToday());
 
+    uiStore.getState().resetToToday();
     this.mountSelectorOverlay();
     this.mountAdminButton();
     this.refresh();
@@ -171,12 +169,9 @@ export class HUDScene extends Phaser.Scene {
 
   private refresh(): void {
     const state = uiStore.getState();
-    const isToday = state.selectedDate === state.today;
     this.dateLabel?.setText(formatLong(state.selectedDate, "es-ES"));
     this.prevBtn?.text.setColor(state.canPrev() ? "#36e36c" : "#8e92a8");
     this.nextBtn?.text.setColor(state.canNext() ? "#36e36c" : "#8e92a8");
-    this.todayBtn?.frame.setVisible(!isToday);
-    this.todayBtn?.text.setVisible(!isToday);
   }
 
   private withinDebounce(): boolean {
@@ -196,8 +191,4 @@ export class HUDScene extends Phaser.Scene {
     if (uiStore.getState().canNext()) uiStore.getState().next();
   }
 
-  private handleToday(): void {
-    if (this.withinDebounce()) return;
-    uiStore.getState().resetToToday();
-  }
 }
