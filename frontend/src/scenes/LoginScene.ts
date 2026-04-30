@@ -177,6 +177,7 @@ export class LoginScene extends Phaser.Scene {
       return;
     }
     const detail = (await detailRes.json()) as OfficeDetail;
+    this.scene.launch("HUDScene");
     this.scene.start("OfficeScene", { detail, meId: me.id });
   }
 
