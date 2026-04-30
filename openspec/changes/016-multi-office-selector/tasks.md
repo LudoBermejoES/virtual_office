@@ -40,9 +40,9 @@ El ciclo TDD por tarea: escribe el test (red) → implementa lo mínimo (green) 
 
 ## 5. Lógica de selección al login
 
-- [ ] 5.1 (test e2e) Usuario sin `default_office_id` y con dos oficinas va a la primera — escribir el test primero.
-- [ ] 5.2 (test e2e) Usuario con `default_office_id=2` va directamente a la 2 — escribir el test primero.
-- [ ] 5.3 (test e2e) Usuario sin ninguna oficina visible ve la pantalla "sin oficina" — escribir el test primero.
+- [x] 5.1 (test e2e) Usuario sin `default_office_id` y con dos oficinas va a la primera — escribir el test primero.
+- [x] 5.2 (test e2e) Usuario con `default_office_id=2` va directamente a la 2 — escribir el test primero.
+- [x] 5.3 (test e2e) Usuario sin ninguna oficina visible ve la pantalla "sin oficina" — escribir el test primero.
 - [x] 5.4 En `LoginScene.handleCredential`: tras autenticar, fetch `/api/me` y `/api/offices`.
 - [x] 5.5 Aplicar la prioridad: server default → localStorage → primera admin → primera visible → "sin oficina".
 - [x] 5.6 Pantalla "sin oficina" muestra mensaje "Aún no hay oficinas. Pide a un admin que cree una".
@@ -56,6 +56,6 @@ El ciclo TDD por tarea: escribe el test (red) → implementa lo mínimo (green) 
 ## 7. Verificación
 
 - [x] 7.1 `pnpm test` (unit + integration) en verde.
-- [ ] 7.2 `pnpm e2e:chromium` en verde con flujo completo "login → selector → cambiar a otra oficina → reservar".
+- [x] 7.2 `pnpm e2e:chromium` en verde con flujo completo "login → selector → cambiar a otra oficina → reservar".
 - [ ] 7.3 Inspección manual: 2 oficinas, cambiar entre ambas, ver bookings independientes.
 - [x] 7.4 `openspec validate --all --strict` en verde.
