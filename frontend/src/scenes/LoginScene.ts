@@ -1,5 +1,8 @@
 import * as Phaser from "phaser";
 import { BASE_URL } from "../config.js";
+import { officesStore, pickOfficeId, VO_LAST_OFFICE_KEY } from "../state/offices.js";
+import type { OfficeSummary } from "@virtual-office/shared";
+import type { OfficeDetail } from "../state/office.js";
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID as string;
 
@@ -126,11 +129,51 @@ export class LoginScene extends Phaser.Scene {
         }
         localStorage.removeItem("inviteToken");
         this.unmountOverlay();
-        this.scene.start("OfficeScene");
+        await this.startOffice();
       })
       .catch(() => {
         this.showError("error de red");
       });
+  }
+
+  private async startOffice(): Promise<void> {
+    const [meRes, officesRes] = await Promise.all([
+      fetch(`${BASE_URL}/api/me`, { credentials: "include" }),
+      fetch(`${BASE_URL}/api/offices`, { credentials: "include" }),
+    ]);
+
+    if (!meRes.ok || !officesRes.ok) {
+      this.showError("error al cargar");
+      return;
+    }
+
+    const me = (await meRes.json()) as { id: number; default_office_id: number | null };
+    const offices = (await officesRes.json()) as OfficeSummary[];
+
+    officesStore.getState().setList(offices, me.id);
+
+    if (offices.length === 0) {
+      this.scene.start("NoOfficeScene");
+      return;
+    }
+
+    const officeId = pickOfficeId(offices, me.default_office_id);
+    if (officeId == null) {
+      this.scene.start("NoOfficeScene");
+      return;
+    }
+
+    localStorage.setItem(VO_LAST_OFFICE_KEY, String(officeId));
+
+    const detailRes = await fetch(`${BASE_URL}/api/offices/${officeId}`, {
+      credentials: "include",
+    });
+    if (!detailRes.ok) {
+      this.showError("error al cargar oficina");
+      return;
+    }
+    const detail = (await detailRes.json()) as OfficeDetail;
+    this.scene.start("OfficeScene", { detail, meId: me.id });
   }
 
   private showError(reason: string): void {

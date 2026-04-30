@@ -6,6 +6,7 @@ import * as invRepo from "../../infra/repos/invitations.js";
 import type { GoogleVerifier } from "../../infra/auth/google-verifier.js";
 import { signJwt, verifyJwt } from "../../infra/auth/session.js";
 import { upsertUser, promoteToAdmin, findUserById } from "../../infra/repos/users.js";
+import * as officesRepo from "../../infra/repos/offices.js";
 import { logger } from "../../config/logger.js";
 import type { Env } from "../../config/env.js";
 
@@ -135,13 +136,43 @@ export async function authRoutes(
     const user = findUserById(db, sessionPayload.sub);
     if (!user) return reply.status(401).send({ reason: "user_not_found" });
 
+    const defaultOfficeId = officesRepo.getUserDefaultOfficeId(db, user.id);
     return reply.status(200).send({
       id: user.id,
       email: user.email,
       name: user.name,
       role: user.role,
       avatarUrl: user.avatar_url,
+      default_office_id: defaultOfficeId,
     });
+  });
+
+  // PATCH /api/me
+  app.patch("/api/me", async (request, reply) => {
+    const token = request.cookies[COOKIE_NAME];
+    if (!token) return reply.status(401).send({ reason: "no_session" });
+
+    let sessionPayload: Awaited<ReturnType<typeof verifyJwt>>;
+    try {
+      sessionPayload = await verifyJwt(
+        token,
+        env.SESSION_SECRET,
+        env.SESSION_SECRET_PREVIOUS || undefined,
+      );
+    } catch {
+      return reply.status(401).send({ reason: "invalid_session" });
+    }
+
+    const user = findUserById(db, sessionPayload.sub);
+    if (!user) return reply.status(401).send({ reason: "user_not_found" });
+
+    const body = z
+      .object({ default_office_id: z.number().int().positive().nullable() })
+      .safeParse(request.body);
+    if (!body.success) return reply.status(400).send({ reason: "bad_request" });
+
+    officesRepo.setUserDefaultOfficeId(db, user.id, body.data.default_office_id);
+    return reply.status(204).send();
   });
 
   // POST /api/auth/logout

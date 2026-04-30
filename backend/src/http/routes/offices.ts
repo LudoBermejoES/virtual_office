@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import type { DatabaseSync } from "node:sqlite";
 import { createReadStream } from "node:fs";
+import { z } from "zod";
 import { fileTypeFromBuffer } from "file-type";
 import { imageSize } from "image-size";
 import { parseTiled, checkTilesetMatch } from "../../domain/tiled.js";
@@ -17,6 +18,7 @@ import { importDesksFromTiled } from "./desks.js";
 import { parseTiledFeatures } from "../../services/tiled-features.parser.js";
 import { parseTiledAnimationsAndNpcs } from "../../services/tiled-animations.parser.js";
 import { parseIsoDate, todayIso } from "../../domain/bookings.js";
+import { canAdminOffice } from "../../services/auth.service.js";
 import { logger } from "../../config/logger.js";
 import type { Env } from "../../config/env.js";
 
@@ -226,11 +228,14 @@ export async function officesRoutes(
     });
   });
 
-  app.patch("/api/offices/:id", { preHandler: app.requireAdmin }, async (request, reply) => {
+  app.patch("/api/offices/:id", { preHandler: app.requireAuth }, async (request, reply) => {
     const params = request.params as { id: string };
     const officeId = Number(params.id);
     if (!Number.isInteger(officeId) || officeId <= 0) {
       return reply.status(400).send({ reason: "bad_request" });
+    }
+    if (!canAdminOffice(request.user!, officeId, db)) {
+      return reply.status(403).send({ reason: "not_authorized" });
     }
     const existing = officesRepo.findOfficeById(db, officeId);
     if (!existing) return reply.status(404).send({ reason: "not_found" });
@@ -309,9 +314,16 @@ export async function officesRoutes(
     return reply.status(200).send({ office: { ...finalOffice, tilesets }, desksImported: 0 });
   });
 
-  app.get("/api/offices", { preHandler: app.requireAuth }, async (_request, reply) => {
+  app.get("/api/offices", { preHandler: app.requireAuth }, async (request, reply) => {
+    const user = request.user!;
     const offices = officesRepo.listOffices(db);
-    const enriched = offices.map((o) => ({ ...o, tilesets: officesRepo.listTilesets(db, o.id) }));
+    const defaultOfficeId = officesRepo.getUserDefaultOfficeId(db, user.id);
+    const enriched = offices.map((o) => ({
+      ...o,
+      tilesets: officesRepo.listTilesets(db, o.id),
+      is_admin: canAdminOffice(user, o.id, db),
+      is_default: o.id === defaultOfficeId,
+    }));
     return reply.status(200).send(enriched);
   });
 
@@ -390,6 +402,40 @@ export async function officesRoutes(
     officesRepo.deleteOffice(db, officeId);
     return reply.status(204).send();
   });
+
+  app.post("/api/offices/:id/admins", { preHandler: app.requireAdmin }, async (request, reply) => {
+    const params = z.object({ id: z.coerce.number().int().positive() }).safeParse(request.params);
+    if (!params.success) return reply.status(400).send({ reason: "bad_request" });
+
+    const body = z.object({ user_id: z.number().int().positive() }).safeParse(request.body);
+    if (!body.success) return reply.status(400).send({ reason: "bad_request" });
+
+    const office = officesRepo.findOfficeById(db, params.data.id);
+    if (!office) return reply.status(404).send({ reason: "not_found" });
+
+    officesRepo.addOfficeAdmin(db, params.data.id, body.data.user_id, request.user!.id);
+    return reply.status(201).send();
+  });
+
+  app.delete(
+    "/api/offices/:id/admins/:userId",
+    { preHandler: app.requireAdmin },
+    async (request, reply) => {
+      const params = z
+        .object({
+          id: z.coerce.number().int().positive(),
+          userId: z.coerce.number().int().positive(),
+        })
+        .safeParse(request.params);
+      if (!params.success) return reply.status(400).send({ reason: "bad_request" });
+
+      const office = officesRepo.findOfficeById(db, params.data.id);
+      if (!office) return reply.status(404).send({ reason: "not_found" });
+
+      officesRepo.removeOfficeAdmin(db, params.data.id, params.data.userId);
+      return reply.status(204).send();
+    },
+  );
 
   app.get("/maps/:officeId/:filename", async (request, reply) => {
     const params = request.params as { officeId: string; filename: string };

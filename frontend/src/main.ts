@@ -5,6 +5,7 @@ import { LoginScene } from "./scenes/LoginScene.js";
 import { OfficeScene } from "./scenes/OfficeScene.js";
 import { AdminMapScene } from "./scenes/AdminMapScene.js";
 import { HUDScene } from "./scenes/HUDScene.js";
+import { NoOfficeScene } from "./scenes/NoOfficeScene.js";
 
 async function preloadFonts(): Promise<void> {
   await Promise.all([
@@ -40,7 +41,7 @@ async function main(): Promise<void> {
     render: {
       antialias: false,
     },
-    scene: [BootScene, LoginScene, OfficeScene, AdminMapScene, HUDScene],
+    scene: [BootScene, LoginScene, OfficeScene, AdminMapScene, HUDScene, NoOfficeScene],
   });
 }
 

@@ -118,6 +118,45 @@ export function replaceTilesets(
   return listTilesets(db, officeId);
 }
 
+export function getUserDefaultOfficeId(db: DatabaseSync, userId: number): number | null {
+  const row = db.prepare("SELECT default_office_id FROM users WHERE id = ?").get(userId) as
+    | { default_office_id: number | null }
+    | undefined;
+  return row?.default_office_id ?? null;
+}
+
+export function setUserDefaultOfficeId(
+  db: DatabaseSync,
+  userId: number,
+  officeId: number | null,
+): void {
+  db.prepare("UPDATE users SET default_office_id = ? WHERE id = ?").run(officeId, userId);
+}
+
+export function listOfficeAdmins(db: DatabaseSync, officeId: number): number[] {
+  const rows = db
+    .prepare("SELECT user_id FROM office_admins WHERE office_id = ?")
+    .all(officeId) as { user_id: number }[];
+  return rows.map((r) => r.user_id);
+}
+
+export function addOfficeAdmin(
+  db: DatabaseSync,
+  officeId: number,
+  userId: number,
+  grantedBy: number,
+): void {
+  db.prepare("INSERT INTO office_admins (office_id, user_id, granted_by) VALUES (?, ?, ?)").run(
+    officeId,
+    userId,
+    grantedBy,
+  );
+}
+
+export function removeOfficeAdmin(db: DatabaseSync, officeId: number, userId: number): void {
+  db.prepare("DELETE FROM office_admins WHERE office_id = ? AND user_id = ?").run(officeId, userId);
+}
+
 export function listTilesets(db: DatabaseSync, officeId: number): OfficeTilesetRow[] {
   return db
     .prepare("SELECT * FROM office_tilesets WHERE office_id = ? ORDER BY ordinal")

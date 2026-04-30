@@ -131,6 +131,16 @@ En Claude Code:
 
 El flujo TDD por scenario está documentado en [`doc/tests/README.md`](doc/tests/README.md).
 
+### Promover un usuario a super-admin
+
+Si necesitas un primer administrador (o promover a alguien que ya existe en la BD), ejecuta desde `backend/`:
+
+```bash
+pnpm bootstrap:admin usuario@ejemplo.com
+```
+
+El script actualiza el campo `role='admin'` para ese email. Si el usuario no existe todavía (no ha hecho login), el script termina sin error y la promoción se aplicará en cuanto el usuario entre por primera vez.
+
 ---
 
 ## Documentación clave

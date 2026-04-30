@@ -5,3 +5,4 @@ export * from "./ws.js";
 export * from "./date.js";
 export * from "./features.js";
 export * from "./npcs.js";
+export * from "./office.js";

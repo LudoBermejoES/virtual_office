@@ -6,13 +6,14 @@ import * as desksRepo from "../../infra/repos/desks.js";
 import { findUserById } from "../../infra/repos/users.js";
 import { officeRoom } from "../../infra/ws/hub.js";
 import type { WsHub } from "../../infra/ws/hub.js";
+import { canAdminOffice } from "../../services/auth.service.js";
 import type { Env } from "../../config/env.js";
 
 export async function fixedAssignmentsRoutes(
   app: FastifyInstance,
   { db, hub }: { db: DatabaseSync; env: Env; hub: WsHub },
 ): Promise<void> {
-  app.post("/api/desks/:id/fixed", { preHandler: app.requireAdmin }, async (request, reply) => {
+  app.post("/api/desks/:id/fixed", { preHandler: app.requireAuth }, async (request, reply) => {
     const params = z.object({ id: z.coerce.number().int().positive() }).safeParse(request.params);
     if (!params.success) return reply.status(400).send({ reason: "bad_request" });
 
@@ -21,6 +22,9 @@ export async function fixedAssignmentsRoutes(
 
     const desk = desksRepo.findDeskById(db, params.data.id);
     if (!desk) return reply.status(404).send({ reason: "desk_not_found" });
+    if (!canAdminOffice(request.user!, desk.office_id, db)) {
+      return reply.status(403).send({ reason: "not_authorized" });
+    }
 
     const user = findUserById(db, body.data.userId);
     if (!user) return reply.status(404).send({ reason: "user_not_found" });
@@ -48,9 +52,14 @@ export async function fixedAssignmentsRoutes(
     }
   });
 
-  app.delete("/api/desks/:id/fixed", { preHandler: app.requireAdmin }, async (request, reply) => {
+  app.delete("/api/desks/:id/fixed", { preHandler: app.requireAuth }, async (request, reply) => {
     const params = z.object({ id: z.coerce.number().int().positive() }).safeParse(request.params);
     if (!params.success) return reply.status(400).send({ reason: "bad_request" });
+
+    const deskForAuth = desksRepo.findDeskById(db, params.data.id);
+    if (deskForAuth && !canAdminOffice(request.user!, deskForAuth.office_id, db)) {
+      return reply.status(403).send({ reason: "not_authorized" });
+    }
 
     const removed = fixedRepo.deleteFixedAssignmentByDesk(db, params.data.id);
     if (!removed) return reply.status(404).send({ reason: "not_found" });

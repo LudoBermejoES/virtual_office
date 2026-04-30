@@ -8,6 +8,7 @@ import * as desksRepo from "../../infra/repos/desks.js";
 import * as officesRepo from "../../infra/repos/offices.js";
 import { parseDesksFromTiled } from "../../domain/desks-from-tiled.js";
 import type { Env } from "../../config/env.js";
+import { canAdminOffice } from "../../services/auth.service.js";
 import { logger } from "../../config/logger.js";
 
 interface ImportWarning {
@@ -91,9 +92,13 @@ export async function desksRoutes(
   app: FastifyInstance,
   { db, env }: { db: DatabaseSync; env: Env },
 ): Promise<void> {
-  app.post("/api/offices/:id/desks", { preHandler: app.requireAdmin }, async (request, reply) => {
+  app.post("/api/offices/:id/desks", { preHandler: app.requireAuth }, async (request, reply) => {
     const params = z.object({ id: z.coerce.number().int().positive() }).safeParse(request.params);
     if (!params.success) return reply.status(400).send({ reason: "bad_request" });
+
+    if (!canAdminOffice(request.user!, params.data.id, db)) {
+      return reply.status(403).send({ reason: "not_authorized" });
+    }
 
     const body = z
       .object({ label: z.string().min(1).max(80), x: z.number(), y: z.number() })
@@ -134,7 +139,7 @@ export async function desksRoutes(
     return reply.status(201).send({ desk });
   });
 
-  app.patch("/api/desks/:id", { preHandler: app.requireAdmin }, async (request, reply) => {
+  app.patch("/api/desks/:id", { preHandler: app.requireAuth }, async (request, reply) => {
     const params = z.object({ id: z.coerce.number().int().positive() }).safeParse(request.params);
     if (!params.success) return reply.status(400).send({ reason: "bad_request" });
 
@@ -149,6 +154,9 @@ export async function desksRoutes(
 
     const desk = desksRepo.findDeskById(db, params.data.id);
     if (!desk) return reply.status(404).send({ reason: "not_found" });
+    if (!canAdminOffice(request.user!, desk.office_id, db)) {
+      return reply.status(403).send({ reason: "not_authorized" });
+    }
 
     const office = officesRepo.findOfficeById(db, desk.office_id);
     if (!office) return reply.status(404).send({ reason: "office_not_found" });
@@ -185,19 +193,27 @@ export async function desksRoutes(
     return reply.status(200).send({ desk: updated });
   });
 
-  app.delete("/api/desks/:id", { preHandler: app.requireAdmin }, async (request, reply) => {
+  app.delete("/api/desks/:id", { preHandler: app.requireAuth }, async (request, reply) => {
     const params = z.object({ id: z.coerce.number().int().positive() }).safeParse(request.params);
     if (!params.success) return reply.status(400).send({ reason: "bad_request" });
+    const desk = desksRepo.findDeskById(db, params.data.id);
+    if (!desk) return reply.status(404).send({ reason: "not_found" });
+    if (!canAdminOffice(request.user!, desk.office_id, db)) {
+      return reply.status(403).send({ reason: "not_authorized" });
+    }
     desksRepo.deleteDesk(db, params.data.id);
     return reply.status(204).send();
   });
 
   app.post(
     "/api/offices/:id/desks/import-from-tiled",
-    { preHandler: app.requireAdmin },
+    { preHandler: app.requireAuth },
     async (request, reply) => {
       const params = z.object({ id: z.coerce.number().int().positive() }).safeParse(request.params);
       if (!params.success) return reply.status(400).send({ reason: "bad_request" });
+      if (!canAdminOffice(request.user!, params.data.id, db)) {
+        return reply.status(403).send({ reason: "not_authorized" });
+      }
 
       const result = importDesksFromTiled(db, params.data.id, env.OFFICE_MAPS_DIR);
       logger.info("desks.imported", {

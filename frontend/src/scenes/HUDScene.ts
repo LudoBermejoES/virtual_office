@@ -1,9 +1,13 @@
 import * as Phaser from "phaser";
 import { formatLong } from "@virtual-office/shared";
 import { uiStore } from "../state/ui.js";
+import { officesStore, VO_LAST_OFFICE_KEY } from "../state/offices.js";
 import { arcadeButton } from "../ui/arcade-button.js";
 import type { ArcadeButton } from "../ui/arcade-button.js";
 import { soundManager } from "../ui/sound.js";
+import { mountOfficeSelector } from "../ui/office-selector.js";
+import { BASE_URL } from "../config.js";
+import type { OfficeDetail } from "../state/office.js";
 
 export class HUDScene extends Phaser.Scene {
   private dateLabel: Phaser.GameObjects.Text | null = null;
@@ -11,6 +15,7 @@ export class HUDScene extends Phaser.Scene {
   private nextBtn: ArcadeButton | null = null;
   private todayBtn: ArcadeButton | null = null;
   private muteBtn: Phaser.GameObjects.Text | null = null;
+  private selectorEl: HTMLDivElement | null = null;
   private debounceUntil = 0;
   private unsubscribe: (() => void) | null = null;
 
@@ -49,13 +54,53 @@ export class HUDScene extends Phaser.Scene {
     this.input.keyboard?.on("keydown-RIGHT", () => this.handleNext());
     this.input.keyboard?.on("keydown-HOME", () => this.handleToday());
 
+    this.mountSelectorOverlay();
     this.refresh();
     this.unsubscribe = uiStore.subscribe(() => this.refresh());
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.unsubscribe?.();
       this.unsubscribe = null;
+      this.selectorEl?.remove();
+      this.selectorEl = null;
     });
+  }
+
+  private mountSelectorOverlay(): void {
+    if (typeof document === "undefined") return;
+    const { list, meId } = officesStore.getState();
+    if (list.length === 0) return;
+
+    const el = document.createElement("div");
+    el.id = "office-selector-overlay";
+    Object.assign(el.style, {
+      position: "fixed",
+      top: "8px",
+      left: "12px",
+      zIndex: "50",
+    });
+
+    const officeScene = this.scene.manager.getScene("OfficeScene");
+    const currentId =
+      (officeScene as unknown as { detail?: { office?: { id?: number } } })?.detail?.office?.id ??
+      list[0]?.id ??
+      0;
+
+    mountOfficeSelector(el, currentId, list, (id) => this.handleOfficeChange(id, meId));
+    document.body.appendChild(el);
+    this.selectorEl = el;
+  }
+
+  private handleOfficeChange(officeId: number, meId: number): void {
+    localStorage.setItem(VO_LAST_OFFICE_KEY, String(officeId));
+    fetch(`${BASE_URL}/api/offices/${officeId}`, { credentials: "include" })
+      .then(async (res) => {
+        if (!res.ok) return;
+        const detail = (await res.json()) as OfficeDetail;
+        this.scene.stop("HUDScene");
+        this.scene.start("OfficeScene", { detail, meId });
+      })
+      .catch(() => {});
   }
 
   private muteIcon(): string {
