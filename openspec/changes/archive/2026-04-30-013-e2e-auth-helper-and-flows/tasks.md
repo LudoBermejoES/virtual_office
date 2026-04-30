@@ -26,9 +26,9 @@
 
 ## 4. Visual regression con sesión real
 
-- [ ] 4.1 Regenerar `login-scene.png` con sesión limpia.
-- [ ] 4.2 Crear baseline `office-scene-states.png` con un desk libre, uno mío, uno ocupado y uno fijo, usando `loginAs` + `setupTestOffice`.
-- [ ] 4.3 Crear baseline `booking-modal.png` con la fecha formateada en castellano.
+- [x] 4.1 Regenerar `login-scene.png` con sesión limpia.
+- [x] 4.2 Crear baseline `office-scene-states.png` con un desk libre, uno mío, uno ocupado y uno fijo, usando `loginAs` + `setupTestOffice`.
+- [x] 4.3 Crear baseline `booking-modal.png` con la fecha formateada en castellano.
 
 ## 5. CI
 
@@ -40,6 +40,6 @@
 ## 6. Verificación
 
 - [x] 6.1 `pnpm test` (unit + integration) en verde.
-- [ ] 6.2 `pnpm e2e:chromium` en verde con todos los flujos nuevos.
+- [x] 6.2 `pnpm e2e:chromium` en verde con todos los flujos nuevos.
 - [x] 6.3 Tests de seguridad: con `NODE_ENV=production` el plugin no está; con `TEST_AUTH=off` el endpoint devuelve 404.
 - [x] 6.4 `openspec validate --all --strict` en verde.
