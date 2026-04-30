@@ -189,13 +189,45 @@ function buildCreateOfficeForm(onCreated: () => void): HTMLElement {
   });
   wrap.appendChild(nameInput);
 
-  const fileInput = document.createElement("input");
-  fileInput.type = "file";
-  fileInput.accept = ".tmj,.json,.png,.webp";
-  fileInput.multiple = true;
-  fileInput.id = "admin-new-office-files";
-  Object.assign(fileInput.style, { color: "#8e92a8", fontSize: "10px", marginRight: "8px" });
-  wrap.appendChild(fileInput);
+  const tmjLabel = document.createElement("label");
+  tmjLabel.textContent = "Mapa .tmj:";
+  Object.assign(tmjLabel.style, {
+    color: "#8e92a8",
+    fontSize: "9px",
+    display: "block",
+    marginTop: "6px",
+  });
+  wrap.appendChild(tmjLabel);
+
+  const tmjInput = document.createElement("input");
+  tmjInput.type = "file";
+  tmjInput.accept = ".tmj,.json";
+  tmjInput.id = "admin-new-office-tmj";
+  Object.assign(tmjInput.style, {
+    color: "#8e92a8",
+    fontSize: "10px",
+    display: "block",
+    marginBottom: "4px",
+  });
+  wrap.appendChild(tmjInput);
+
+  const tilesetsLabel = document.createElement("label");
+  tilesetsLabel.textContent = "Tilesets (.png o .webp, uno o más):";
+  Object.assign(tilesetsLabel.style, { color: "#8e92a8", fontSize: "9px", display: "block" });
+  wrap.appendChild(tilesetsLabel);
+
+  const tilesetsInput = document.createElement("input");
+  tilesetsInput.type = "file";
+  tilesetsInput.accept = ".png,.webp";
+  tilesetsInput.multiple = true;
+  tilesetsInput.id = "admin-new-office-tilesets";
+  Object.assign(tilesetsInput.style, {
+    color: "#8e92a8",
+    fontSize: "10px",
+    display: "block",
+    marginBottom: "8px",
+  });
+  wrap.appendChild(tilesetsInput);
 
   const btn = document.createElement("button");
   btn.textContent = "CREAR";
@@ -212,12 +244,21 @@ function buildCreateOfficeForm(onCreated: () => void): HTMLElement {
   btn.addEventListener("click", () => {
     const name = nameInput.value.trim();
     if (!name) return;
-    const files = fileInput.files;
-    if (!files || files.length === 0) return;
+    const tmjFile = tmjInput.files?.[0];
+    if (!tmjFile) {
+      btn.textContent = "FALTA .TMJ";
+      return;
+    }
+    const tilesetFiles = tilesetsInput.files;
+    if (!tilesetFiles || tilesetFiles.length === 0) {
+      btn.textContent = "FALTA TILESET";
+      return;
+    }
 
     const fd = new FormData();
     fd.append("name", name);
-    for (const f of Array.from(files)) fd.append("files", f);
+    fd.append("tmj", tmjFile);
+    for (const f of Array.from(tilesetFiles)) fd.append("tilesets", f);
 
     fetch(`${BASE_URL}/api/offices`, {
       method: "POST",
