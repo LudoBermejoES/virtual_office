@@ -76,6 +76,8 @@ export class OfficeScene extends Phaser.Scene {
     }
     for (const layer of map.layers) map.createLayer(layer.name, tilesetObjs);
 
+    this.fitCameraToMap(map);
+
     this.zoneGraphics = this.add.graphics();
     this.renderZones();
     this.defineSpriteAnimations();
@@ -124,6 +126,20 @@ export class OfficeScene extends Phaser.Scene {
       this.wsHandle?.close();
       this.wsHandle = null;
     });
+  }
+
+  private fitCameraToMap(map: Phaser.Tilemaps.Tilemap): void {
+    const HUD_HEIGHT = 48;
+    const { width, height } = this.scale;
+    const availH = height - HUD_HEIGHT;
+    const mapW = map.widthInPixels;
+    const mapH = map.heightInPixels;
+    const zoom = Math.min(width / mapW, availH / mapH);
+    const cam = this.cameras.main;
+    cam.setZoom(zoom);
+    // Center the viewport in the available area below the HUD
+    cam.setViewport(0, HUD_HEIGHT, width, availH);
+    cam.centerOn(mapW / 2, mapH / 2);
   }
 
   private defineSpriteAnimations(): void {
@@ -257,6 +273,7 @@ export class OfficeScene extends Phaser.Scene {
     for (const desk of this.detail.desks) {
       const state = deskState(desk, this.detail.bookings, this.meId);
       const rect = drawDesk(this, desk, state);
+      if (state !== "free") rect.setAlpha(0);
       rect.setInteractive();
       rect.on("pointerdown", () => void this.handleDeskClick(desk));
       this.deskRects.set(desk.id, rect);

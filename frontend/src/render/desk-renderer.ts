@@ -50,8 +50,8 @@ export function drawDesk(
     DESK_SIZE_PX,
     DESK_SIZE_PX,
     COLORS[state],
-    state === "placing" ? 0.5 : 0.8,
+    state === "placing" ? 0.5 : 0.01,
   );
-  rect.setStrokeStyle(2, 0xffffff, 1);
+  rect.setStrokeStyle(2, 0xffffff, 0.01);
   return rect;
 }

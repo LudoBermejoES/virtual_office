@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-const FILENAME_REGEX = /^[a-zA-Z0-9_.-]+\.(png|webp)$/;
+const FILENAME_REGEX = /^[a-zA-Z0-9_ .-]+\.(png|webp)$/;
 
 const TilesetEmbedded = z
   .object({

@@ -18,15 +18,27 @@ export function placeAvatar(
   x: number,
   y: number,
 ): AvatarVisual {
-  const photo = scene.add.image(x, y, textureKey).setDisplaySize(AVATAR_DIAMETER, AVATAR_DIAMETER);
-  const maskShape = scene.make.graphics({ x: 0, y: 0 }, false);
-  maskShape.fillStyle(0xffffff, 1);
-  maskShape.fillCircle(x, y, AVATAR_RADIUS);
-  photo.setMask(maskShape.createGeometryMask());
+  const circularKey = `${textureKey}:circle`;
+
+  if (!scene.textures.exists(circularKey)) {
+    const src = scene.textures.get(textureKey).getSourceImage() as HTMLImageElement;
+    const d = AVATAR_DIAMETER;
+    const canvas = document.createElement("canvas");
+    canvas.width = d;
+    canvas.height = d;
+    const ctx = canvas.getContext("2d")!;
+    ctx.beginPath();
+    ctx.arc(d / 2, d / 2, d / 2, 0, Math.PI * 2);
+    ctx.closePath();
+    ctx.clip();
+    ctx.drawImage(src, 0, 0, d, d);
+    scene.textures.addCanvas(circularKey, canvas);
+  }
+
+  const photo = scene.add.image(x, y, circularKey);
   return {
     destroy() {
       photo.destroy();
-      maskShape.destroy();
     },
   };
 }
