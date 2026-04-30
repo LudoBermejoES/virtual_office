@@ -375,14 +375,142 @@ function buildOfficeRow(office: { id: number; name: string }, onChanged: () => v
     }
   });
 
+  const updateMapBtn = document.createElement("button");
+  updateMapBtn.textContent = "Actualizar mapa ▼";
+  Object.assign(updateMapBtn.style, {
+    background: "transparent",
+    border: "1px solid #8e92a8",
+    color: "#8e92a8",
+    fontFamily: '"Press Start 2P", monospace',
+    fontSize: "8px",
+    padding: "4px 6px",
+    cursor: "pointer",
+  });
+
+  const updateMapForm = buildUpdateMapForm(office.id, () => {
+    updateMapForm.style.display = "none";
+    updateMapBtn.textContent = "Actualizar mapa ▼";
+    onChanged();
+  });
+  updateMapForm.style.display = "none";
+
+  updateMapBtn.addEventListener("click", () => {
+    const open = updateMapForm.style.display !== "none";
+    updateMapForm.style.display = open ? "none" : "block";
+    updateMapBtn.textContent = open ? "Actualizar mapa ▼" : "Actualizar mapa ▲";
+  });
+
   row.appendChild(nameEl);
+  row.appendChild(updateMapBtn);
   row.appendChild(editBtn);
   row.appendChild(adminsBtn);
   row.appendChild(delBtn);
 
   const wrap = document.createElement("div");
   wrap.appendChild(row);
+  wrap.appendChild(updateMapForm);
   wrap.appendChild(adminsPanel);
+  return wrap;
+}
+
+function buildUpdateMapForm(officeId: number, onSaved: () => void): HTMLElement {
+  const wrap = document.createElement("div");
+  Object.assign(wrap.style, {
+    padding: "10px 0 10px 12px",
+    borderLeft: "2px solid #8e92a8",
+    marginBottom: "8px",
+  });
+
+  const tmjLabel = document.createElement("label");
+  tmjLabel.textContent = "Mapa .tmj:";
+  Object.assign(tmjLabel.style, {
+    color: "#8e92a8",
+    fontSize: "9px",
+    display: "block",
+    marginBottom: "4px",
+  });
+  wrap.appendChild(tmjLabel);
+
+  const tmjInput = document.createElement("input");
+  tmjInput.type = "file";
+  tmjInput.accept = ".tmj,.json";
+  Object.assign(tmjInput.style, {
+    color: "#8e92a8",
+    fontSize: "10px",
+    display: "block",
+    marginBottom: "6px",
+  });
+  wrap.appendChild(tmjInput);
+
+  const tilesetsLabel = document.createElement("label");
+  tilesetsLabel.textContent = "Tilesets (.png o .webp, uno o más):";
+  Object.assign(tilesetsLabel.style, {
+    color: "#8e92a8",
+    fontSize: "9px",
+    display: "block",
+    marginBottom: "4px",
+  });
+  wrap.appendChild(tilesetsLabel);
+
+  const tilesetsInput = document.createElement("input");
+  tilesetsInput.type = "file";
+  tilesetsInput.accept = ".png,.webp";
+  tilesetsInput.multiple = true;
+  Object.assign(tilesetsInput.style, {
+    color: "#8e92a8",
+    fontSize: "10px",
+    display: "block",
+    marginBottom: "8px",
+  });
+  wrap.appendChild(tilesetsInput);
+
+  const saveBtn = document.createElement("button");
+  saveBtn.textContent = "GUARDAR";
+  Object.assign(saveBtn.style, {
+    background: "#36e36c",
+    border: "none",
+    color: "#0d0d1a",
+    fontFamily: '"Press Start 2P", monospace',
+    fontSize: "10px",
+    padding: "6px 12px",
+    cursor: "pointer",
+  });
+
+  saveBtn.addEventListener("click", () => {
+    const tmjFile = tmjInput.files?.[0];
+    if (!tmjFile) {
+      saveBtn.textContent = "FALTA .TMJ";
+      return;
+    }
+    const tilesetFiles = tilesetsInput.files;
+    if (!tilesetFiles || tilesetFiles.length === 0) {
+      saveBtn.textContent = "FALTA TILESET";
+      return;
+    }
+
+    saveBtn.textContent = "GUARDANDO…";
+    saveBtn.disabled = true;
+
+    const fd = new FormData();
+    fd.append("tmj", tmjFile);
+    for (const f of Array.from(tilesetFiles)) fd.append("tilesets", f);
+
+    fetch(`${BASE_URL}/api/offices/${officeId}`, {
+      method: "PATCH",
+      credentials: "include",
+      body: fd,
+    })
+      .then((r) => {
+        if (!r.ok) throw new Error("error");
+        onSaved();
+      })
+      .catch(() => {
+        saveBtn.textContent = "ERROR";
+        saveBtn.disabled = false;
+      });
+  });
+
+  wrap.appendChild(saveBtn);
   return wrap;
 }
 
