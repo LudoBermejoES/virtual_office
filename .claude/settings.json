@@ -116,7 +116,10 @@
       "Bash(sed -i '' 's/^### Requirement:/## Requirement:/g' /Users/ludo/code/teimas_space/openspec/specs/reservas/spec.md)",
       "Bash(sed -i '' 's/^# Delta — Realtime$/# Realtime/' /Users/ludo/code/teimas_space/openspec/specs/realtime/spec.md)",
       "Bash(sed -i '' '/^## ADDED Requirements$/d' /Users/ludo/code/teimas_space/openspec/specs/realtime/spec.md)",
-      "Bash(sed -i '' 's/^### Requirement:/## Requirement:/g' /Users/ludo/code/teimas_space/openspec/specs/realtime/spec.md)"
+      "Bash(sed -i '' 's/^### Requirement:/## Requirement:/g' /Users/ludo/code/teimas_space/openspec/specs/realtime/spec.md)",
+      "Bash(sed -i '' 's/^# Delta — UI Game$/# UI Game/' /Users/ludo/code/teimas_space/openspec/specs/ui-game/spec.md)",
+      "Bash(sed -i '' '/^## ADDED Requirements$/d' /Users/ludo/code/teimas_space/openspec/specs/ui-game/spec.md)",
+      "Bash(sed -i '' 's/^### Requirement:/## Requirement:/g' /Users/ludo/code/teimas_space/openspec/specs/ui-game/spec.md)"
     ],
     "deny": [
       "Read(.env)",

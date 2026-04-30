@@ -3,6 +3,7 @@ import { BASE_URL } from "../config.js";
 import { drawDesk } from "../render/desk-renderer.js";
 import { deskState } from "../domain/desk-state.js";
 import { connectOffice } from "../realtime/socket.js";
+import { uiStore, shouldApply } from "../state/ui.js";
 import type { ConnectHandle } from "../realtime/socket.js";
 import type { WsServerMessage } from "@virtual-office/shared";
 import type { Desk, OfficeDetail } from "../state/office.js";
@@ -72,7 +73,15 @@ export class OfficeScene extends Phaser.Scene {
 
     this.connectRealtime();
 
+    const unsubscribeDate = uiStore.subscribe((state, prev) => {
+      if (state.selectedDate !== prev.selectedDate && this.detail) {
+        this.detail.date = state.selectedDate;
+        void this.refreshSnapshot();
+      }
+    });
+
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      unsubscribeDate();
       this.wsHandle?.close();
       this.wsHandle = null;
     });
@@ -100,6 +109,7 @@ export class OfficeScene extends Phaser.Scene {
 
   private applyDelta(msg: WsServerMessage): void {
     if (!this.detail) return;
+    if (!shouldApply(msg, this.detail.date)) return;
     if (msg.type === "snapshot.ts") return;
     if (msg.type === "auth.expired") return;
     if (msg.type === "office.updated") {

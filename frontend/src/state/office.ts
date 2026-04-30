@@ -1,4 +1,4 @@
-import { create } from "zustand";
+import { createStore } from "zustand/vanilla";
 
 export interface Desk {
   id: number;
@@ -50,9 +50,9 @@ function indexBookings(bookings: BookingDto[]): Map<string, BookingDto> {
   return map;
 }
 
-export const useOfficeStore = create<OfficeStore>((set) => ({
+export const officeStore = createStore<OfficeStore>()((set) => ({
   detail: null,
   bookingsByKey: new Map(),
-  setDetail: (d) => set({ detail: d, bookingsByKey: indexBookings(d.bookings) }),
+  setDetail: (d: OfficeDetail) => set({ detail: d, bookingsByKey: indexBookings(d.bookings) }),
   clear: () => set({ detail: null, bookingsByKey: new Map() }),
 }));
