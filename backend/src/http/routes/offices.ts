@@ -313,10 +313,16 @@ export async function officesRoutes(
     featuresRepo.deleteFeatures(db, officeId);
     featuresRepo.insertFeatures(db, officeId, features);
 
+    const importResult = importDesksFromTiled(db, officeId, env.OFFICE_MAPS_DIR);
+
     hub.broadcast(officeRoom(officeId), { type: "office.updated", officeId });
 
     const finalOffice = officesRepo.findOfficeById(db, officeId)!;
-    return reply.status(200).send({ office: { ...finalOffice, tilesets }, desksImported: 0 });
+    return reply.status(200).send({
+      office: { ...finalOffice, tilesets },
+      desksImported: importResult.imported,
+      desksWarnings: importResult.warnings,
+    });
   });
 
   app.get("/api/offices", { preHandler: app.requireAuth }, async (request, reply) => {
