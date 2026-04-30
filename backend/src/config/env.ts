@@ -19,6 +19,8 @@ const envSchema = z.object({
   INVITATION_TTL_DAYS: z.coerce.number().int().positive().default(7),
   PUBLIC_BASE_URL: z.string().default("http://localhost:5173"),
 
+  MAX_DESKS_PER_OFFICE: z.coerce.number().int().positive().default(200),
+
   SENTRY_DSN: z.string().optional().default(""),
 
   OFFICE_MAPS_DIR: z.string().default("./data/maps"),

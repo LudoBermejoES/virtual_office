@@ -407,6 +407,47 @@ describe("offices upload", () => {
     const res = await server.app.inject({ method: "GET", url: "/api/offices" });
     expect(res.statusCode).toBe(401);
   });
+
+  it("POST con tmj que incluye object layer 'desks' → desks aparecen con source=tiled", async () => {
+    const tmjBase = JSON.parse(makeTmj()) as Record<string, unknown>;
+    (tmjBase["layers"] as unknown[]).push({
+      type: "objectgroup",
+      name: "desks",
+      objects: [
+        { id: 1, name: "A1", x: 100, y: 100, point: true },
+        { id: 2, name: "A2", x: 200, y: 200, point: true },
+        { id: 3, name: "A3", x: 300, y: 300, point: true },
+      ],
+    });
+    const m = buildMultipart([
+      { name: "name", value: "HQ" },
+      {
+        name: "tmj",
+        filename: "office.tmj",
+        contentType: "application/json",
+        data: Buffer.from(JSON.stringify(tmjBase)),
+      },
+      { name: "tilesets", filename: "office_tiles.png", contentType: "image/png", data: makePng(64, 64) },
+    ]);
+    const res = await server.app.inject({
+      method: "POST",
+      url: "/api/offices",
+      headers: { ...m.headers, cookie },
+      payload: m.body,
+    });
+    expect(res.statusCode).toBe(201);
+    const data = res.json<{ office: { id: number }; desksImported: number }>();
+    expect(data.desksImported).toBe(3);
+
+    const detail = await server.app.inject({
+      method: "GET",
+      url: `/api/offices/${data.office.id}`,
+      headers: { cookie },
+    });
+    const desks = detail.json<{ desks: Array<{ source: string; label: string }> }>().desks;
+    expect(desks).toHaveLength(3);
+    expect(desks.every((d) => d.source === "tiled")).toBe(true);
+  });
 });
 
 describe("/maps/:officeId/:filename serving", () => {

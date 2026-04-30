@@ -6,6 +6,8 @@ import { imageSize } from "image-size";
 import { parseTiled, checkTilesetMatch } from "../../domain/tiled.js";
 import { saveBundle, serveSafe } from "../../infra/storage/office-maps.js";
 import * as officesRepo from "../../infra/repos/offices.js";
+import * as desksRepo from "../../infra/repos/desks.js";
+import { importDesksFromTiled } from "./desks.js";
 import { logger } from "../../config/logger.js";
 import type { Env } from "../../config/env.js";
 
@@ -188,8 +190,14 @@ export async function officesRoutes(
       bytes: totalBytes,
     });
 
+    const importResult = importDesksFromTiled(db, office.id, env.OFFICE_MAPS_DIR);
+
     const finalOffice = officesRepo.findOfficeById(db, office.id)!;
-    return reply.status(201).send({ office: { ...finalOffice, tilesets } });
+    return reply.status(201).send({
+      office: { ...finalOffice, tilesets },
+      desksImported: importResult.imported,
+      desksWarnings: importResult.warnings,
+    });
   });
 
   app.patch("/api/offices/:id", { preHandler: app.requireAdmin }, async (request, reply) => {
@@ -262,7 +270,8 @@ export async function officesRoutes(
     const office = officesRepo.findOfficeById(db, officeId);
     if (!office) return reply.status(404).send({ reason: "not_found" });
     const tilesets = officesRepo.listTilesets(db, officeId);
-    return reply.status(200).send({ office, tilesets, desks: [], bookings: [] });
+    const desks = desksRepo.listByOffice(db, officeId);
+    return reply.status(200).send({ office, tilesets, desks, bookings: [] });
   });
 
   app.delete("/api/offices/:id", { preHandler: app.requireAdmin }, async (request, reply) => {

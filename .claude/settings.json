@@ -107,7 +107,10 @@
       "WebFetch(domain:fonts.google.com)",
       "Bash(SESSION_SECRET=\"supersecretodealmenos32caracteresaqui\" pnpm --filter backend test --coverage)",
       "Bash(SESSION_SECRET=\"supersecretodealmenos32caracteresaqui\" npx vitest run tests/integration/offices.test.ts)",
-      "Bash(SESSION_SECRET=\"supersecretodealmenos32caracteresaqui\" npx vitest run tests/integration/offices.test.ts -t \"bundle válido\")"
+      "Bash(SESSION_SECRET=\"supersecretodealmenos32caracteresaqui\" npx vitest run tests/integration/offices.test.ts -t \"bundle válido\")",
+      "Bash(sed -i '' 's/^# Delta — Puestos$/# Puestos/' /Users/ludo/code/teimas_space/openspec/specs/puestos/spec.md)",
+      "Bash(sed -i '' '/^## ADDED Requirements$/d' /Users/ludo/code/teimas_space/openspec/specs/puestos/spec.md)",
+      "Bash(sed -i '' 's/^### Requirement:/## Requirement:/g' /Users/ludo/code/teimas_space/openspec/specs/puestos/spec.md)"
     ],
     "deny": [
       "Read(.env)",
