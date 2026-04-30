@@ -110,7 +110,10 @@
       "Bash(SESSION_SECRET=\"supersecretodealmenos32caracteresaqui\" npx vitest run tests/integration/offices.test.ts -t \"bundle válido\")",
       "Bash(sed -i '' 's/^# Delta — Puestos$/# Puestos/' /Users/ludo/code/teimas_space/openspec/specs/puestos/spec.md)",
       "Bash(sed -i '' '/^## ADDED Requirements$/d' /Users/ludo/code/teimas_space/openspec/specs/puestos/spec.md)",
-      "Bash(sed -i '' 's/^### Requirement:/## Requirement:/g' /Users/ludo/code/teimas_space/openspec/specs/puestos/spec.md)"
+      "Bash(sed -i '' 's/^### Requirement:/## Requirement:/g' /Users/ludo/code/teimas_space/openspec/specs/puestos/spec.md)",
+      "Bash(sed -i '' 's/^# Delta — Reservas$/# Reservas/' /Users/ludo/code/teimas_space/openspec/specs/reservas/spec.md)",
+      "Bash(sed -i '' '/^## ADDED Requirements$/d' /Users/ludo/code/teimas_space/openspec/specs/reservas/spec.md)",
+      "Bash(sed -i '' 's/^### Requirement:/## Requirement:/g' /Users/ludo/code/teimas_space/openspec/specs/reservas/spec.md)"
     ],
     "deny": [
       "Read(.env)",

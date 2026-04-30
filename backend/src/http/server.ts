@@ -12,6 +12,7 @@ import { authRoutes } from "./routes/auth.js";
 import { invitationsRoutes } from "./routes/invitations.js";
 import { officesRoutes } from "./routes/offices.js";
 import { desksRoutes } from "./routes/desks.js";
+import { bookingsRoutes } from "./routes/bookings.js";
 import type { GoogleVerifier } from "../infra/auth/google-verifier.js";
 
 export interface ServerDeps {
@@ -44,6 +45,7 @@ export async function buildServer({ db, googleVerifier, env: envOverride }: Serv
   await app.register(invitationsRoutes, { db, env });
   await app.register(officesRoutes, { db, env });
   await app.register(desksRoutes, { db, env });
+  await app.register(bookingsRoutes, { db, env });
 
   app.addContentTypeParser("application/json", { parseAs: "string" }, (_, body, done) => {
     try {

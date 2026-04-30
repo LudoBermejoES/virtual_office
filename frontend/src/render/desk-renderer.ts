@@ -1,7 +1,15 @@
 import type * as Phaser from "phaser";
 import { DESK_SIZE_PX, DESK_HALF } from "@virtual-office/shared";
 
-export type DeskRenderState = "idle" | "selected" | "placing" | "invalid";
+export type DeskRenderState =
+  | "idle"
+  | "selected"
+  | "placing"
+  | "invalid"
+  | "free"
+  | "mine"
+  | "occupied"
+  | "fixed";
 
 export interface DeskCorners {
   left: number;
@@ -24,6 +32,10 @@ const COLORS: Record<DeskRenderState, number> = {
   selected: 0x00ffff,
   placing: 0xffff00,
   invalid: 0xff4444,
+  free: 0x00ff9f,
+  mine: 0x00ffff,
+  occupied: 0xff4444,
+  fixed: 0xa040ff,
 };
 
 export function drawDesk(

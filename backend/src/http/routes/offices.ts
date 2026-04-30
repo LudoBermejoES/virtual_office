@@ -7,7 +7,9 @@ import { parseTiled, checkTilesetMatch } from "../../domain/tiled.js";
 import { saveBundle, serveSafe } from "../../infra/storage/office-maps.js";
 import * as officesRepo from "../../infra/repos/offices.js";
 import * as desksRepo from "../../infra/repos/desks.js";
+import * as bookingsRepo from "../../infra/repos/bookings.js";
 import { importDesksFromTiled } from "./desks.js";
+import { parseIsoDate, todayIso } from "../../domain/bookings.js";
 import { logger } from "../../config/logger.js";
 import type { Env } from "../../config/env.js";
 
@@ -271,7 +273,23 @@ export async function officesRoutes(
     if (!office) return reply.status(404).send({ reason: "not_found" });
     const tilesets = officesRepo.listTilesets(db, officeId);
     const desks = desksRepo.listByOffice(db, officeId);
-    return reply.status(200).send({ office, tilesets, desks, bookings: [] });
+
+    const query = request.query as { date?: string };
+    const dateRaw = query.date ?? todayIso();
+    const parsed = parseIsoDate(dateRaw);
+    const date = parsed.ok ? parsed.date : todayIso();
+
+    const rows = bookingsRepo.listByOfficeAndDate(db, officeId, date);
+    const bookings = rows.map((b) => ({
+      id: b.id,
+      deskId: b.desk_id,
+      userId: b.user_id,
+      type: b.type,
+      date: b.date,
+      user: { id: b.user_id, name: b.userName, avatar_url: b.userAvatarUrl },
+    }));
+
+    return reply.status(200).send({ office, tilesets, desks, bookings, date });
   });
 
   app.delete("/api/offices/:id", { preHandler: app.requireAdmin }, async (request, reply) => {

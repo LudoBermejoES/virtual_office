@@ -20,6 +20,7 @@ const envSchema = z.object({
   PUBLIC_BASE_URL: z.string().default("http://localhost:5173"),
 
   MAX_DESKS_PER_OFFICE: z.coerce.number().int().positive().default(200),
+  BOOKING_HORIZON_DAYS: z.coerce.number().int().positive().default(60),
 
   SENTRY_DSN: z.string().optional().default(""),
 
