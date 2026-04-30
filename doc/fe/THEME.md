@@ -82,6 +82,48 @@ Las capturas se generan con Playwright en `tests/e2e/visual.spec.ts` y se almace
 pnpm e2e:chromium -- --update-snapshots tests/e2e/visual.spec.ts
 ```
 
+## Sprites animados
+
+### Sprite de puesto ocupado (`desk-sit`)
+
+- **Archivo**: `frontend/public/assets/sprites/desk-sit.png`
+- **Formato**: spritesheet 128×48 px, 4 frames de 32×48 px
+- **Animación Phaser**: `desk-sit-idle`, 4 fps, repeat −1
+- **Tint**: determinístico por `userId` usando `seatTint(userId)` → `colorForUser` → HSL → RGB int
+
+Para añadir un nuevo sprite de puesto:
+
+1. Añade el spritesheet en `frontend/public/assets/sprites/`.
+2. Carga en `BootScene.preload` con `this.load.spritesheet(key, path, { frameWidth, frameHeight })`.
+3. Define la animación en `OfficeScene.defineSpriteAnimations`.
+4. Llama a `placeSeatSprite` en `renderDesks` para desks con booking.
+
+### NPCs decorativos
+
+Sprites enum permitido: `cat-idle`, `bird-idle`, `roomba-idle`, `plant-sway`.
+
+| Clave tileset     | Archivo PNG      | Tamaño | Anim Phaser       |
+| ----------------- | ---------------- | ------ | ----------------- |
+| `npc-cat-idle`    | `npc-cat.png`    | 32×32  | `npc-cat-idle`    |
+| `npc-bird-idle`   | `npc-bird.png`   | 32×32  | `npc-bird-idle`   |
+| `npc-roomba-idle` | `npc-roomba.png` | 32×32  | `npc-roomba-idle` |
+| `npc-plant-sway`  | `npc-plant.png`  | 32×32  | `npc-plant-sway`  |
+
+Para añadir un nuevo NPC:
+
+1. Añade el PNG en `frontend/public/assets/sprites/` (CC0, indicar fuente en el commit).
+2. Añade `NpcSprite` al enum en `packages/shared/src/npcs.ts`.
+3. Añade al `NPC_SPRITE_ENUM` en `backend/src/services/tiled-animations.parser.ts`.
+4. Añade la clave de textura y animación en `frontend/src/render/npc-renderer.ts`.
+5. Carga en `BootScene.preload` y define animación en `OfficeScene.defineSpriteAnimations`.
+
+### Atribución CC0
+
+Los assets actuales son placeholders generados programáticamente. Al sustituirlos por assets reales:
+
+- Indicar la fuente en el commit (OpenGameArt, Itch.io, etc.).
+- Verificar licencia CC0 o CC-BY con atribución en `doc/fe/ASSETS.md`.
+
 ## Reglas de mantenimiento
 
 1. **No introducir nuevas fuentes** sin actualizar esta guía y los specs de `012-videogame-typography`.

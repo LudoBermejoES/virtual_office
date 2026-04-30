@@ -1,7 +1,7 @@
 import { createStore } from "zustand/vanilla";
-import type { OfficeFeaturesPayload } from "@virtual-office/shared";
+import type { OfficeFeaturesPayload, NpcData } from "@virtual-office/shared";
 
-export type { OfficeFeaturesPayload };
+export type { OfficeFeaturesPayload, NpcData };
 
 export interface Desk {
   id: number;
@@ -32,11 +32,17 @@ export interface OfficeDetail {
     cells_x: number;
     cells_y: number;
   };
-  tilesets: Array<{ ordinal: number; image_name: string; filename: string }>;
+  tilesets: Array<{
+    ordinal: number;
+    image_name: string;
+    filename: string;
+    animations?: unknown[];
+  }>;
   desks: Desk[];
   bookings: BookingDto[];
   date: string;
   features: OfficeFeaturesPayload;
+  npcs: NpcData[];
 }
 
 export interface OfficeStore {

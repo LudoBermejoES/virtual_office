@@ -10,10 +10,12 @@ import * as desksRepo from "../../infra/repos/desks.js";
 import * as bookingsRepo from "../../infra/repos/bookings.js";
 import * as fixedRepo from "../../infra/repos/fixed-assignments.js";
 import * as featuresRepo from "../../infra/repos/features.js";
+import * as npcsRepo from "../../infra/repos/npcs.js";
 import { officeRoom } from "../../infra/ws/hub.js";
 import type { WsHub } from "../../infra/ws/hub.js";
 import { importDesksFromTiled } from "./desks.js";
 import { parseTiledFeatures } from "../../services/tiled-features.parser.js";
+import { parseTiledAnimationsAndNpcs } from "../../services/tiled-animations.parser.js";
 import { parseIsoDate, todayIso } from "../../domain/bookings.js";
 import { logger } from "../../config/logger.js";
 import type { Env } from "../../config/env.js";
@@ -186,30 +188,39 @@ export async function officesRoutes(
       map_width: cells_x * tile_width,
       map_height: cells_y * tile_height,
     });
-    const tilesets = officesRepo.replaceTilesets(db, office.id, saved.tilesets);
-
-    const totalBytes =
-      partsResult.parts.tmj!.buffer.length +
-      tilesetParts.reduce((acc, t) => acc + t.buffer.length, 0);
-    logger.info("office.created", {
-      officeId: office.id,
-      tilesetCount: tilesets.length,
-      bytes: totalBytes,
-    });
-
     const importResult = importDesksFromTiled(db, office.id, env.OFFICE_MAPS_DIR);
 
     const tmjJson = JSON.parse(partsResult.parts.tmj!.buffer.toString("utf-8")) as Record<
       string,
       unknown
     >;
+
+    const animResult = parseTiledAnimationsAndNpcs(tmjJson);
+    if ("error" in animResult) {
+      return reply.status(413).send({ reason: animResult.error });
+    }
+    if (animResult.npcWarnings.length > 0) {
+      logger.info("office.npc_warnings", { officeId: office.id, warnings: animResult.npcWarnings });
+    }
+    const animByOrdinal = new Map(
+      animResult.tilesetAnimations.map((a) => [a.ordinal, a.animations]),
+    );
+    const tilesetsWithAnims = saved.tilesets.map((t) => ({
+      ...t,
+      animations_json: JSON.stringify(animByOrdinal.get(t.ordinal) ?? []),
+    }));
+    const tilesetsRows = officesRepo.replaceTilesets(db, office.id, tilesetsWithAnims);
+
+    npcsRepo.deleteNpcs(db, office.id);
+    npcsRepo.insertNpcs(db, office.id, animResult.npcs);
+
     const features = parseTiledFeatures(tmjJson);
     featuresRepo.deleteFeatures(db, office.id);
     featuresRepo.insertFeatures(db, office.id, features);
 
     const finalOffice = officesRepo.findOfficeById(db, office.id)!;
     return reply.status(201).send({
-      office: { ...finalOffice, tilesets },
+      office: { ...finalOffice, tilesets: tilesetsRows },
       desksImported: importResult.imported,
       desksWarnings: importResult.warnings,
     });
@@ -264,12 +275,30 @@ export async function officesRoutes(
       map_width: cells_x * tile_width,
       map_height: cells_y * tile_height,
     });
-    const tilesets = officesRepo.replaceTilesets(db, officeId, saved.tilesets);
-
     const tmjJson = JSON.parse(partsResult.parts.tmj!.buffer.toString("utf-8")) as Record<
       string,
       unknown
     >;
+
+    const animResult = parseTiledAnimationsAndNpcs(tmjJson);
+    if ("error" in animResult) {
+      return reply.status(413).send({ reason: animResult.error });
+    }
+    if (animResult.npcWarnings.length > 0) {
+      logger.info("office.npc_warnings", { officeId, warnings: animResult.npcWarnings });
+    }
+    const animByOrdinal = new Map(
+      animResult.tilesetAnimations.map((a) => [a.ordinal, a.animations]),
+    );
+    const tilesetsWithAnims = saved.tilesets.map((t) => ({
+      ...t,
+      animations_json: JSON.stringify(animByOrdinal.get(t.ordinal) ?? []),
+    }));
+    const tilesets = officesRepo.replaceTilesets(db, officeId, tilesetsWithAnims);
+
+    npcsRepo.deleteNpcs(db, officeId);
+    npcsRepo.insertNpcs(db, officeId, animResult.npcs);
+
     const features = parseTiledFeatures(tmjJson);
     featuresRepo.deleteFeatures(db, officeId);
     featuresRepo.insertFeatures(db, officeId, features);
@@ -340,8 +369,16 @@ export async function officesRoutes(
     }
 
     const features = featuresRepo.listFeatures(db, officeId);
+    const npcRows = npcsRepo.listNpcs(db, officeId);
+    const npcs = npcRows.map(({ id, name, x, y, sprite }) => ({ id, name, x, y, sprite }));
+    const tilesetsWithAnimations = tilesets.map((t) => ({
+      ...t,
+      animations: JSON.parse(t.animations_json) as unknown[],
+    }));
 
-    return reply.status(200).send({ office, tilesets, desks, bookings, date, features });
+    return reply
+      .status(200)
+      .send({ office, tilesets: tilesetsWithAnimations, desks, bookings, date, features, npcs });
   });
 
   app.delete("/api/offices/:id", { preHandler: app.requireAdmin }, async (request, reply) => {

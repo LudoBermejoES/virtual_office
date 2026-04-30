@@ -4,6 +4,9 @@ import { drawDesk } from "../render/desk-renderer.js";
 import { drawZone, drawLabel, findZoneAt } from "../render/zone-renderer.js";
 import { placeAvatar, placeFallback } from "../render/avatar-mask.js";
 import type { AvatarVisual } from "../render/avatar-mask.js";
+import { placeSeatSprite, SEAT_ANIM_KEY, SEAT_SPRITE_KEY } from "../render/seat-sprite.js";
+import { renderNpcs } from "../render/npc-renderer.js";
+import { SpritePool } from "../render/sprite-pool.js";
 import { deskState } from "../domain/desk-state.js";
 import { connectOffice } from "../realtime/socket.js";
 import { uiStore, shouldApply } from "../state/ui.js";
@@ -16,7 +19,11 @@ export class OfficeScene extends Phaser.Scene {
   private meId: number = 0;
   private deskRects: Map<number, Phaser.GameObjects.Rectangle> = new Map();
   private deskAvatars: Map<number, AvatarVisual> = new Map();
+  private deskSeatSprites: Map<number, Phaser.GameObjects.Sprite> = new Map();
   private avatarStatus: Map<number, "loading" | "ready"> = new Map();
+  private npcSprites: Phaser.GameObjects.Sprite[] = [];
+  private spritePool: SpritePool = new SpritePool();
+  private poolTimer: Phaser.Time.TimerEvent | null = null;
   private tooltipEl: HTMLDivElement | null = null;
   private feedbackText: Phaser.GameObjects.Text | null = null;
   private zoneText: Phaser.GameObjects.Text | null = null;
@@ -71,7 +78,9 @@ export class OfficeScene extends Phaser.Scene {
 
     this.zoneGraphics = this.add.graphics();
     this.renderZones();
+    this.defineSpriteAnimations();
     this.renderDesks();
+    this.renderNpcs();
 
     this.feedbackText = this.add
       .text(8, height - 24, "", {
@@ -95,6 +104,12 @@ export class OfficeScene extends Phaser.Scene {
       this.zoneText?.setText(zone ? zone.name : "");
     });
 
+    this.poolTimer = this.time.addEvent({
+      delay: 500,
+      loop: true,
+      callback: () => this.updateSpritePool(),
+    });
+
     this.connectRealtime();
 
     const unsubscribeDate = uiStore.subscribe((state, prev) => {
@@ -109,6 +124,47 @@ export class OfficeScene extends Phaser.Scene {
       this.wsHandle?.close();
       this.wsHandle = null;
     });
+  }
+
+  private defineSpriteAnimations(): void {
+    if (this.textures.exists(SEAT_SPRITE_KEY) && !this.anims.exists(SEAT_ANIM_KEY)) {
+      this.anims.create({
+        key: SEAT_ANIM_KEY,
+        frames: this.anims.generateFrameNumbers(SEAT_SPRITE_KEY, { start: 0, end: 3 }),
+        frameRate: 4,
+        repeat: -1,
+      });
+    }
+    const npcDefs: Array<{ key: string; animKey: string; frames: number }> = [
+      { key: "npc-cat-idle", animKey: "npc-cat-idle", frames: 1 },
+      { key: "npc-bird-idle", animKey: "npc-bird-idle", frames: 1 },
+      { key: "npc-roomba-idle", animKey: "npc-roomba-idle", frames: 1 },
+      { key: "npc-plant-sway", animKey: "npc-plant-sway", frames: 1 },
+    ];
+    for (const def of npcDefs) {
+      if (this.textures.exists(def.key) && !this.anims.exists(def.animKey)) {
+        this.anims.create({
+          key: def.animKey,
+          frames: this.anims.generateFrameNumbers(def.key, { start: 0, end: def.frames - 1 }),
+          frameRate: 4,
+          repeat: -1,
+        });
+      }
+    }
+  }
+
+  private renderNpcs(): void {
+    for (const s of this.npcSprites) s.destroy();
+    this.npcSprites = [];
+    if (!this.detail?.npcs) return;
+    this.npcSprites = renderNpcs(this, this.detail.npcs);
+    this.updateSpritePool();
+  }
+
+  private updateSpritePool(): void {
+    const allSprites = [...this.deskSeatSprites.values(), ...this.npcSprites];
+    if (allSprites.length === 0) return;
+    this.spritePool.update(allSprites, this.cameras.main);
   }
 
   private renderZones(): void {
@@ -190,6 +246,8 @@ export class OfficeScene extends Phaser.Scene {
     this.deskRects.clear();
     for (const visual of this.deskAvatars.values()) visual.destroy();
     this.deskAvatars.clear();
+    for (const s of this.deskSeatSprites.values()) s.destroy();
+    this.deskSeatSprites.clear();
     this.renderDesks();
   }
 
@@ -205,36 +263,45 @@ export class OfficeScene extends Phaser.Scene {
 
       const booking = this.detail.bookings.find((b) => b.deskId === desk.id);
       if (booking) {
-        this.renderAvatarFor(desk, booking.user);
+        const seatSprite = placeSeatSprite(this, desk.x, desk.y, booking.user.id);
+        if (seatSprite) {
+          this.deskSeatSprites.set(desk.id, seatSprite);
+          this.renderAvatarFor(desk, booking.user, -28);
+        } else {
+          this.renderAvatarFor(desk, booking.user, 0);
+        }
         rect.on("pointerover", (pointer: Phaser.Input.Pointer) => {
           this.showTooltip(booking.user.name, pointer.x, pointer.y);
         });
         rect.on("pointerout", () => this.hideTooltip());
       }
     }
+    this.updateSpritePool();
   }
 
   private renderAvatarFor(
     desk: Desk,
     user: { id: number; name: string; avatar_url: string | null },
+    yOffset: number = 0,
   ): void {
+    const ay = desk.y + yOffset;
     if (!user.avatar_url) {
-      const visual = placeFallback(this, desk.x, desk.y, user);
+      const visual = placeFallback(this, desk.x, ay, user);
       this.deskAvatars.set(desk.id, visual);
       return;
     }
     const key = `avatar:${user.id}`;
     if (this.textures.exists(key)) {
-      const visual = placeAvatar(this, key, desk.x, desk.y);
+      const visual = placeAvatar(this, key, desk.x, ay);
       this.deskAvatars.set(desk.id, visual);
       return;
     }
     if (this.avatarStatus.get(user.id) === "loading") {
-      const fb = placeFallback(this, desk.x, desk.y, user);
+      const fb = placeFallback(this, desk.x, ay, user);
       this.deskAvatars.set(desk.id, fb);
       return;
     }
-    const fallback = placeFallback(this, desk.x, desk.y, user);
+    const fallback = placeFallback(this, desk.x, ay, user);
     this.deskAvatars.set(desk.id, fallback);
     this.avatarStatus.set(user.id, "loading");
     this.load.image(key, user.avatar_url);
@@ -242,7 +309,7 @@ export class OfficeScene extends Phaser.Scene {
       this.avatarStatus.set(user.id, "ready");
       const cur = this.deskAvatars.get(desk.id);
       if (cur) cur.destroy();
-      const visual = placeAvatar(this, key, desk.x, desk.y);
+      const visual = placeAvatar(this, key, desk.x, ay);
       this.deskAvatars.set(desk.id, visual);
     });
     this.load.once("loaderror", () => {
@@ -376,6 +443,7 @@ export class OfficeScene extends Phaser.Scene {
     this.detail = fresh;
 
     this.rerenderDesks();
+    this.renderNpcs();
   }
 
   private showFeedback(message: string): void {

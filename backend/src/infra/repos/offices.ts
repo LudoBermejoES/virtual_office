@@ -20,6 +20,7 @@ export interface OfficeTilesetRow {
   image_name: string;
   filename: string;
   mime_type: "image/png" | "image/webp";
+  animations_json: string;
 }
 
 export function createOffice(
@@ -101,11 +102,18 @@ export function replaceTilesets(
 ): OfficeTilesetRow[] {
   db.prepare("DELETE FROM office_tilesets WHERE office_id = ?").run(officeId);
   const insert = db.prepare(
-    `INSERT INTO office_tilesets (office_id, ordinal, image_name, filename, mime_type)
-     VALUES (?, ?, ?, ?, ?)`,
+    `INSERT INTO office_tilesets (office_id, ordinal, image_name, filename, mime_type, animations_json)
+     VALUES (?, ?, ?, ?, ?, ?)`,
   );
   for (const t of tilesets) {
-    insert.run(officeId, t.ordinal, t.image_name, t.filename, t.mime_type);
+    insert.run(
+      officeId,
+      t.ordinal,
+      t.image_name,
+      t.filename,
+      t.mime_type,
+      t.animations_json ?? "[]",
+    );
   }
   return listTilesets(db, officeId);
 }

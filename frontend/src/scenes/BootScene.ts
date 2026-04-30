@@ -8,6 +8,26 @@ export class BootScene extends Phaser.Scene {
 
   preload(): void {
     this.load.image("frame-9slice", "/assets/ui/frame-9slice.png");
+    this.load.spritesheet("desk-sit", "/assets/sprites/desk-sit.png", {
+      frameWidth: 32,
+      frameHeight: 48,
+    });
+    this.load.spritesheet("npc-cat-idle", "/assets/sprites/npc-cat.png", {
+      frameWidth: 32,
+      frameHeight: 32,
+    });
+    this.load.spritesheet("npc-bird-idle", "/assets/sprites/npc-bird.png", {
+      frameWidth: 32,
+      frameHeight: 32,
+    });
+    this.load.spritesheet("npc-roomba-idle", "/assets/sprites/npc-roomba.png", {
+      frameWidth: 32,
+      frameHeight: 32,
+    });
+    this.load.spritesheet("npc-plant-sway", "/assets/sprites/npc-plant.png", {
+      frameWidth: 32,
+      frameHeight: 32,
+    });
   }
 
   create(): void {

@@ -487,6 +487,27 @@ El backend reconoce tres layers por nombre exacto:
 - Máximo 200 features totales (zones + rooms + labels). Si se supera, la subida se rechaza con `too_many_features`.
 - Las features se almacenan en la tabla `office_features` y se devuelven en `GET /api/offices/:id` bajo la clave `features: { zones, rooms, labels }`.
 
+**Object layer "npcs"** (decorativo, opcional):
+
+- Si el `.tmj` contiene un object layer cuyo `name` es exactamente `"npcs"`, los objetos `point: true` de ese layer se importan como NPCs decorativos.
+- Cada objeto debe tener una propiedad personalizada `sprite` (tipo string) con uno de los valores del enum permitido:
+
+| Valor `sprite`  | Descripción       |
+| --------------- | ----------------- |
+| `cat-idle`      | Gato animado      |
+| `bird-idle`     | Pájaro animado    |
+| `roomba-idle`   | Roomba animado    |
+| `plant-sway`    | Planta oscilante  |
+
+- Objetos con `sprite` fuera del enum se descartan silenciosamente; el backend registra un warning por cada uno en logs (`office.npc_warnings`).
+- Límite duro: **50 NPCs por oficina**. Si el layer tiene más de 50 objetos, la subida devuelve `413` con `reason: "too_many_npcs"`.
+- Los NPCs se almacenan en la tabla `office_npcs` y se devuelven en `GET /api/offices/:id` bajo la clave `npcs`.
+
+**Animaciones de tileset**:
+
+- Si un tileset del `.tmj` tiene tiles con el campo `animation` (array de `{ tileid, duration }`), el backend persiste ese array como `animations_json` en la tabla `office_tilesets`.
+- `GET /api/offices/:id` devuelve los tilesets enriquecidos con el campo `animations: TileAnimation[]` (parsed del JSON), listo para que el cliente configure las animaciones Phaser.
+
 ---
 
 ## Geometría de zonas (puestos)
