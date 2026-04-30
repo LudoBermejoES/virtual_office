@@ -8,6 +8,7 @@ import { saveBundle, serveSafe } from "../../infra/storage/office-maps.js";
 import * as officesRepo from "../../infra/repos/offices.js";
 import * as desksRepo from "../../infra/repos/desks.js";
 import * as bookingsRepo from "../../infra/repos/bookings.js";
+import * as fixedRepo from "../../infra/repos/fixed-assignments.js";
 import { importDesksFromTiled } from "./desks.js";
 import { parseIsoDate, todayIso } from "../../domain/bookings.js";
 import { logger } from "../../config/logger.js";
@@ -280,14 +281,41 @@ export async function officesRoutes(
     const date = parsed.ok ? parsed.date : todayIso();
 
     const rows = bookingsRepo.listByOfficeAndDate(db, officeId, date);
-    const bookings = rows.map((b) => ({
-      id: b.id,
-      deskId: b.desk_id,
-      userId: b.user_id,
-      type: b.type,
-      date: b.date,
-      user: { id: b.user_id, name: b.userName, avatar_url: b.userAvatarUrl },
-    }));
+    const dailyByDeskId = new Map<number, (typeof rows)[number]>();
+    for (const b of rows) dailyByDeskId.set(b.desk_id, b);
+
+    const fixedRows = fixedRepo.listByOffice(db, officeId);
+
+    const bookings: Array<{
+      id: number;
+      deskId: number;
+      userId: number;
+      type: "daily" | "fixed";
+      date: string;
+      user: { id: number; name: string; avatar_url: string | null };
+    }> = [];
+
+    for (const b of rows) {
+      bookings.push({
+        id: b.id,
+        deskId: b.desk_id,
+        userId: b.user_id,
+        type: b.type,
+        date: b.date,
+        user: { id: b.user_id, name: b.userName, avatar_url: b.userAvatarUrl },
+      });
+    }
+    for (const f of fixedRows) {
+      if (dailyByDeskId.has(f.desk_id)) continue;
+      bookings.push({
+        id: -f.id,
+        deskId: f.desk_id,
+        userId: f.user_id,
+        type: "fixed",
+        date,
+        user: { id: f.user_id, name: f.userName, avatar_url: f.userAvatarUrl },
+      });
+    }
 
     return reply.status(200).send({ office, tilesets, desks, bookings, date });
   });

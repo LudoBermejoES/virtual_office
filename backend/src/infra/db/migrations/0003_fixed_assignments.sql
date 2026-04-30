@@ -1,0 +1,7 @@
+CREATE TABLE IF NOT EXISTS fixed_assignments (
+  id INTEGER PRIMARY KEY,
+  desk_id INTEGER NOT NULL UNIQUE REFERENCES desks(id) ON DELETE CASCADE,
+  user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+  assigned_by_user_id INTEGER NOT NULL REFERENCES users(id),
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);

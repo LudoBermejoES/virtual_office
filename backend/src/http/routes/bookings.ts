@@ -3,6 +3,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { z } from "zod";
 import * as bookingsRepo from "../../infra/repos/bookings.js";
 import * as desksRepo from "../../infra/repos/desks.js";
+import * as fixedRepo from "../../infra/repos/fixed-assignments.js";
 import { isInWindow, parseIsoDate, todayIso } from "../../domain/bookings.js";
 import { UniqueViolation } from "../../infra/repos/bookings.js";
 import type { Env } from "../../config/env.js";
@@ -31,6 +32,10 @@ export async function bookingsRoutes(
 
     const desk = desksRepo.findDeskById(db, params.data.id);
     if (!desk) return reply.status(404).send({ reason: "desk_not_found" });
+
+    if (fixedRepo.findByDeskId(db, desk.id)) {
+      return reply.status(409).send({ reason: "desk_has_fixed_assignment" });
+    }
 
     try {
       const booking = bookingsRepo.createBooking(db, {

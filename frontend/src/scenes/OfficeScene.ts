@@ -80,7 +80,12 @@ export class OfficeScene extends Phaser.Scene {
     if (!this.detail) return;
     const state = deskState(desk, this.detail.bookings, this.meId);
 
-    if (state === "occupied" || state === "fixed") {
+    if (state === "fixed") {
+      const b = this.detail.bookings.find((x) => x.deskId === desk.id);
+      this.showFeedback(`📌 Puesto fijo de ${b?.user.name ?? "otro usuario"}`);
+      return;
+    }
+    if (state === "occupied") {
       const b = this.detail.bookings.find((x) => x.deskId === desk.id);
       this.showFeedback(`Ocupado por ${b?.user.name ?? "otro usuario"}`);
       return;

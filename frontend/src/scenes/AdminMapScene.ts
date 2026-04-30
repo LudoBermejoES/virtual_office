@@ -64,11 +64,16 @@ export class AdminMapScene extends Phaser.Scene {
     for (const d of this.desks) this.renderDesk(d);
 
     this.hudText = this.add
-      .text(8, 8, "ADMIN — N: nuevo · F2: renombrar · DEL: borrar", {
-        fontFamily: '"Press Start 2P"',
-        fontSize: "10px",
-        color: "#00ff9f",
-      })
+      .text(
+        8,
+        8,
+        "ADMIN — N: nuevo · F2: renombrar · DEL: borrar · F: fijo · Shift+F: quitar fijo",
+        {
+          fontFamily: '"Press Start 2P"',
+          fontSize: "10px",
+          color: "#00ff9f",
+        },
+      )
       .setScrollFactor(0);
 
     this.input.on("pointerdown", (pointer: Phaser.Input.Pointer) => {
@@ -80,6 +85,10 @@ export class AdminMapScene extends Phaser.Scene {
     this.input.keyboard?.on("keydown-F2", () => void this.renameSelected());
     this.input.keyboard?.on("keydown-DELETE", () => void this.deleteSelected());
     this.input.keyboard?.on("keydown-BACKSPACE", () => void this.deleteSelected());
+    this.input.keyboard?.on("keydown-F", (event: KeyboardEvent) => {
+      if (event.shiftKey) void this.unassignFixed();
+      else void this.assignFixed();
+    });
 
     this.input.on("pointermove", (pointer: Phaser.Input.Pointer) => {
       if (this.placingPreview) {
@@ -216,6 +225,47 @@ export class AdminMapScene extends Phaser.Scene {
       this.deskRects.delete(id);
       this.desks = this.desks.filter((d) => d.id !== id);
       this.selectedId = null;
+    }
+  }
+
+  private async assignFixed(): Promise<void> {
+    if (this.selectedId === null) {
+      this.hudText?.setText("Selecciona un puesto primero");
+      return;
+    }
+    const userIdRaw = window.prompt("ID del usuario al que asignar como fijo");
+    if (!userIdRaw) return;
+    const userId = Number(userIdRaw);
+    if (!Number.isInteger(userId) || userId <= 0) {
+      this.hudText?.setText("ID inválido");
+      return;
+    }
+    const res = await fetch(`${BASE_URL}/api/desks/${this.selectedId}/fixed`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ userId }),
+    });
+    if (res.status === 201) {
+      this.hudText?.setText(`Asignado fijo en desk #${this.selectedId}`);
+    } else {
+      const err = (await res.json().catch(() => ({}))) as { reason?: string };
+      this.hudText?.setText(`Error: ${err.reason ?? res.status}`);
+    }
+  }
+
+  private async unassignFixed(): Promise<void> {
+    if (this.selectedId === null) return;
+    if (!window.confirm("¿Quitar puesto fijo?")) return;
+    const res = await fetch(`${BASE_URL}/api/desks/${this.selectedId}/fixed`, {
+      method: "DELETE",
+      credentials: "include",
+    });
+    if (res.status === 204) {
+      this.hudText?.setText(`Fijo retirado en desk #${this.selectedId}`);
+    } else {
+      const err = (await res.json().catch(() => ({}))) as { reason?: string };
+      this.hudText?.setText(`Error: ${err.reason ?? res.status}`);
     }
   }
 }
