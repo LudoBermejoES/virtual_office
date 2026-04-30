@@ -30,7 +30,7 @@ async function main(): Promise<void> {
     parent: "game",
     width: window.innerWidth,
     height: window.innerHeight,
-    backgroundColor: "#0d0d1a",
+    backgroundColor: "#0b0d1a",
     pixelArt: true,
     roundPixels: true,
     scale: {

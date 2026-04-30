@@ -48,7 +48,7 @@ export class OfficeScene extends Phaser.Scene {
         .text(width / 2, height / 2, "OFFICE\n(sin mapa cargado)", {
           fontFamily: '"Press Start 2P"',
           fontSize: "14px",
-          color: "#00ff9f",
+          color: "#36e36c",
           align: "center",
           lineSpacing: 10,
         })
@@ -72,7 +72,7 @@ export class OfficeScene extends Phaser.Scene {
       .text(8, height - 24, "", {
         fontFamily: '"VT323"',
         fontSize: "16px",
-        color: "#ffff00",
+        color: "#ffd166",
       })
       .setScrollFactor(0);
 
@@ -226,10 +226,8 @@ export class OfficeScene extends Phaser.Scene {
       position: "fixed",
       pointerEvents: "none",
       padding: "4px 8px",
-      backgroundColor: "rgba(0, 0, 0, 0.85)",
-      color: "#ffffff",
-      fontFamily: '"VT323", monospace',
-      fontSize: "16px",
+      backgroundColor: "rgba(11, 13, 26, 0.9)",
+      color: "var(--color-fg)",
       borderRadius: "4px",
       display: "none",
       zIndex: "1000",

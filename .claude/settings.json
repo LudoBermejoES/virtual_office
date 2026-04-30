@@ -119,7 +119,9 @@
       "Bash(sed -i '' 's/^### Requirement:/## Requirement:/g' /Users/ludo/code/teimas_space/openspec/specs/realtime/spec.md)",
       "Bash(sed -i '' 's/^# Delta — UI Game$/# UI Game/' /Users/ludo/code/teimas_space/openspec/specs/ui-game/spec.md)",
       "Bash(sed -i '' '/^## ADDED Requirements$/d' /Users/ludo/code/teimas_space/openspec/specs/ui-game/spec.md)",
-      "Bash(sed -i '' 's/^### Requirement:/## Requirement:/g' /Users/ludo/code/teimas_space/openspec/specs/ui-game/spec.md)"
+      "Bash(sed -i '' 's/^### Requirement:/## Requirement:/g' /Users/ludo/code/teimas_space/openspec/specs/ui-game/spec.md)",
+      "WebFetch(domain:opengameart.org)",
+      "Bash(unzip -l /tmp/sfx512.zip)"
     ],
     "deny": [
       "Read(.env)",

@@ -1,12 +1,16 @@
 import * as Phaser from "phaser";
 import { formatLong } from "@virtual-office/shared";
 import { uiStore } from "../state/ui.js";
+import { arcadeButton } from "../ui/arcade-button.js";
+import type { ArcadeButton } from "../ui/arcade-button.js";
+import { soundManager } from "../ui/sound.js";
 
 export class HUDScene extends Phaser.Scene {
   private dateLabel: Phaser.GameObjects.Text | null = null;
-  private prevBtn: Phaser.GameObjects.Text | null = null;
-  private nextBtn: Phaser.GameObjects.Text | null = null;
-  private todayBtn: Phaser.GameObjects.Text | null = null;
+  private prevBtn: ArcadeButton | null = null;
+  private nextBtn: ArcadeButton | null = null;
+  private todayBtn: ArcadeButton | null = null;
+  private muteBtn: Phaser.GameObjects.Text | null = null;
   private debounceUntil = 0;
   private unsubscribe: (() => void) | null = null;
 
@@ -17,44 +21,29 @@ export class HUDScene extends Phaser.Scene {
   create(): void {
     const { width } = this.scale;
 
-    this.prevBtn = this.add
-      .text(width / 2 - 220, 20, "<", {
-        fontFamily: '"Press Start 2P"',
-        fontSize: "20px",
-        color: "#00ff9f",
-      })
-      .setScrollFactor(0)
-      .setInteractive({ useHandCursor: true });
-    this.prevBtn.on("pointerdown", () => this.handlePrev());
+    this.prevBtn = arcadeButton(this, width / 2 - 220, 28, "<", () => this.handlePrev());
+    this.nextBtn = arcadeButton(this, width / 2 + 220, 28, ">", () => this.handleNext());
+    this.todayBtn = arcadeButton(this, width - 120, 28, "HOY", () => this.handleToday());
 
     this.dateLabel = this.add
-      .text(width / 2, 24, "", {
+      .text(width / 2, 28, "", {
         fontFamily: '"VT323"',
         fontSize: "22px",
-        color: "#ffffff",
+        color: "#f5f5f5",
       })
-      .setOrigin(0.5, 0)
+      .setOrigin(0.5)
       .setScrollFactor(0);
 
-    this.nextBtn = this.add
-      .text(width / 2 + 200, 20, ">", {
+    this.muteBtn = this.add
+      .text(width - 32, 28, this.muteIcon(), {
         fontFamily: '"Press Start 2P"',
-        fontSize: "20px",
-        color: "#00ff9f",
+        fontSize: "14px",
+        color: "#8e92a8",
       })
+      .setOrigin(0.5)
       .setScrollFactor(0)
       .setInteractive({ useHandCursor: true });
-    this.nextBtn.on("pointerdown", () => this.handleNext());
-
-    this.todayBtn = this.add
-      .text(width - 100, 24, "[Hoy]", {
-        fontFamily: '"Press Start 2P"',
-        fontSize: "12px",
-        color: "#ffff00",
-      })
-      .setScrollFactor(0)
-      .setInteractive({ useHandCursor: true });
-    this.todayBtn.on("pointerdown", () => this.handleToday());
+    this.muteBtn.on("pointerdown", () => this.handleMuteToggle());
 
     this.input.keyboard?.on("keydown-LEFT", () => this.handlePrev());
     this.input.keyboard?.on("keydown-RIGHT", () => this.handleNext());
@@ -69,13 +58,24 @@ export class HUDScene extends Phaser.Scene {
     });
   }
 
+  private muteIcon(): string {
+    return soundManager.isMuted() ? "[M]" : "[S]";
+  }
+
+  private handleMuteToggle(): void {
+    soundManager.toggle();
+    this.muteBtn?.setText(this.muteIcon());
+    soundManager.play("beep-click");
+  }
+
   private refresh(): void {
     const state = uiStore.getState();
     const isToday = state.selectedDate === state.today;
     this.dateLabel?.setText(formatLong(state.selectedDate, "es-ES"));
-    this.prevBtn?.setColor(state.canPrev() ? "#00ff9f" : "#444444");
-    this.nextBtn?.setColor(state.canNext() ? "#00ff9f" : "#444444");
-    this.todayBtn?.setVisible(!isToday);
+    this.prevBtn?.text.setColor(state.canPrev() ? "#36e36c" : "#8e92a8");
+    this.nextBtn?.text.setColor(state.canNext() ? "#36e36c" : "#8e92a8");
+    this.todayBtn?.frame.setVisible(!isToday);
+    this.todayBtn?.text.setVisible(!isToday);
   }
 
   private withinDebounce(): boolean {

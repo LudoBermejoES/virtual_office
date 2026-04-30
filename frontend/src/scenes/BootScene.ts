@@ -6,6 +6,10 @@ export class BootScene extends Phaser.Scene {
     super({ key: "BootScene" });
   }
 
+  preload(): void {
+    this.load.image("frame-9slice", "/assets/ui/frame-9slice.png");
+  }
+
   create(): void {
     const { width, height } = this.scale;
 
@@ -13,7 +17,7 @@ export class BootScene extends Phaser.Scene {
       .text(width / 2, height / 2, "PRESS START\nLOADING...", {
         fontFamily: '"Press Start 2P"',
         fontSize: "16px",
-        color: "#00ff9f",
+        color: "#36e36c",
         align: "center",
         lineSpacing: 12,
       })

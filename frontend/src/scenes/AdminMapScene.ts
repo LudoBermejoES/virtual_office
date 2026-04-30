@@ -71,7 +71,7 @@ export class AdminMapScene extends Phaser.Scene {
         {
           fontFamily: '"Press Start 2P"',
           fontSize: "10px",
-          color: "#00ff9f",
+          color: "#36e36c",
         },
       )
       .setScrollFactor(0);
@@ -186,9 +186,9 @@ export class AdminMapScene extends Phaser.Scene {
   private refreshSelectionStyles(): void {
     for (const [id, rect] of this.deskRects) {
       if (id === this.selectedId) {
-        rect.setStrokeStyle(3, 0x00ffff, 1);
+        rect.setStrokeStyle(3, 0x5cf6ff, 1);
       } else {
-        rect.setStrokeStyle(2, 0xffffff, 1);
+        rect.setStrokeStyle(2, 0xf5f5f5, 1);
       }
     }
   }

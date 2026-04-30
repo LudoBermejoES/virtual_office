@@ -18,7 +18,7 @@ export class LoginScene extends Phaser.Scene {
       .text(width / 2, height / 2 - 60, "VIRTUAL OFFICE", {
         fontFamily: '"Press Start 2P"',
         fontSize: "20px",
-        color: "#00ff9f",
+        color: "#36e36c",
         align: "center",
       })
       .setOrigin(0.5);
@@ -27,7 +27,7 @@ export class LoginScene extends Phaser.Scene {
       .text(width / 2, height / 2, "PRESS START\nLOGIN WITH GOOGLE", {
         fontFamily: '"Press Start 2P"',
         fontSize: "12px",
-        color: "#ffffff",
+        color: "#f5f5f5",
         align: "center",
         lineSpacing: 10,
       })
@@ -37,7 +37,7 @@ export class LoginScene extends Phaser.Scene {
       .text(width / 2, height / 2 + 80, "", {
         fontFamily: '"VT323"',
         fontSize: "20px",
-        color: "#ff4444",
+        color: "#ff4d6d",
         align: "center",
       })
       .setOrigin(0.5);

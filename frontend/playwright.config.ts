@@ -8,6 +8,9 @@ export default defineConfig({
     trace: "on-first-retry",
     video: "retain-on-failure",
   },
+  expect: {
+    toMatchSnapshot: { maxDiffPixelRatio: 0.001 },
+  },
   projects: [
     { name: "chromium", use: { ...devices["Desktop Chrome"] } },
     { name: "firefox", use: { ...devices["Desktop Firefox"] } },

@@ -1,5 +1,6 @@
 import type * as Phaser from "phaser";
 import { DESK_SIZE_PX, DESK_HALF } from "@virtual-office/shared";
+import { THEME } from "./theme.js";
 
 export type DeskRenderState =
   | "idle"
@@ -28,14 +29,14 @@ export function deskCorners(x: number, y: number): DeskCorners {
 }
 
 const COLORS: Record<DeskRenderState, number> = {
-  idle: 0x00ff9f,
-  selected: 0x00ffff,
-  placing: 0xffff00,
-  invalid: 0xff4444,
-  free: 0x00ff9f,
-  mine: 0x00ffff,
-  occupied: 0xff4444,
-  fixed: 0xa040ff,
+  idle: THEME.free,
+  selected: THEME.mine,
+  placing: THEME.warning,
+  invalid: THEME.danger,
+  free: THEME.free,
+  mine: THEME.mine,
+  occupied: THEME.occupied,
+  fixed: THEME.fixed,
 };
 
 export function drawDesk(
