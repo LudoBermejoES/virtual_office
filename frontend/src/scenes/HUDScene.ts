@@ -12,6 +12,7 @@ import {
   setEditDesksCallback,
   setPickDeskCallback,
 } from "../ui/admin-panel.js";
+import { mountDayPicker, unmountDayPicker, isDayPickerOpen } from "../ui/day-picker.js";
 import { BASE_URL } from "../config.js";
 import type { OfficeDetail } from "../state/office.js";
 
@@ -44,7 +45,9 @@ export class HUDScene extends Phaser.Scene {
         color: "#f5f5f5",
       })
       .setOrigin(0.5)
-      .setScrollFactor(0);
+      .setScrollFactor(0)
+      .setInteractive({ useHandCursor: true });
+    this.dateLabel.on("pointerdown", () => this.toggleDayPicker());
 
     this.muteBtn = this.add
       .text(width - 32, 28, this.muteIcon(), {
@@ -59,6 +62,7 @@ export class HUDScene extends Phaser.Scene {
 
     this.input.keyboard?.on("keydown-LEFT", () => this.handlePrev());
     this.input.keyboard?.on("keydown-RIGHT", () => this.handleNext());
+    this.input.keyboard?.on("keydown-C", () => this.toggleDayPicker());
 
     uiStore.getState().resetToToday();
     this.mountSelectorOverlay();
@@ -74,7 +78,22 @@ export class HUDScene extends Phaser.Scene {
       this.adminBtnEl?.remove();
       this.adminBtnEl = null;
       unmountAdminPanel();
+      unmountDayPicker();
     });
+  }
+
+  private toggleDayPicker(): void {
+    if (isDayPickerOpen()) {
+      unmountDayPicker();
+      return;
+    }
+    if (!this.dateLabel) {
+      mountDayPicker();
+      return;
+    }
+    // dateLabel tiene scrollFactor=0; sus coords son ya de pantalla.
+    const bounds = this.dateLabel.getBounds();
+    mountDayPicker({ x: bounds.centerX, y: bounds.bottom + 8 });
   }
 
   private mountAdminButton(): void {

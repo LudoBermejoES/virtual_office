@@ -193,3 +193,112 @@ canvas {
   font-family: var(--font-body);
   font-size: 18px;
 }
+
+/* Day picker (calendario arcade) */
+.day-picker {
+  position: fixed;
+  z-index: 200;
+  background: var(--color-bg-2);
+  border: 2px solid var(--color-success);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  user-select: none;
+}
+
+.day-picker__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-family: var(--font-display);
+  font-size: 12px;
+  color: var(--color-success);
+}
+
+.day-picker__title {
+  flex: 1;
+  text-align: center;
+  letter-spacing: 1px;
+}
+
+.day-picker__nav {
+  background: transparent;
+  border: 1px solid var(--color-success);
+  color: var(--color-success);
+  font-family: var(--font-display);
+  font-size: 10px;
+  width: 24px;
+  height: 24px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.day-picker__nav:hover:not(:disabled) {
+  background: var(--color-success);
+  color: var(--color-bg);
+}
+
+.day-picker__nav:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.day-picker__weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 32px);
+  gap: 2px;
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: var(--color-muted);
+}
+
+.day-picker__weekday {
+  text-align: center;
+}
+
+.day-picker__grid {
+  display: grid;
+  grid-template-columns: repeat(7, 32px);
+  gap: 2px;
+}
+
+.day-picker__cell {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--color-fg);
+  font-family: var(--font-body);
+  font-size: 18px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.day-picker__cell:hover:not(:disabled):not(.day-picker__cell--out) {
+  background: var(--color-bg);
+  border-color: var(--color-muted);
+}
+
+.day-picker__cell--out-of-month {
+  opacity: 0.4;
+}
+
+.day-picker__cell--today {
+  border-color: var(--color-success);
+}
+
+.day-picker__cell--selected {
+  background: var(--color-accent);
+  color: var(--color-bg);
+  border-color: var(--color-accent);
+}
+
+.day-picker__cell--out {
+  opacity: 0.2;
+  cursor: default;
+}
