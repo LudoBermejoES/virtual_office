@@ -126,7 +126,11 @@
       "Bash(SESSION_SECRET=\"supersecretodealmenos32caracteresaqui\" pnpm vitest run tests/integration/test-auth.test.ts)",
       "Bash(SESSION_SECRET=\"supersecretodealmenos32caracteresaqui\" pnpm vitest run tests/unit/services/tiled-features.parser.test.ts)",
       "Bash(pnpm format *)",
-      "Bash(pnpm format:check)"
+      "Bash(pnpm format:check)",
+      "Bash(sort -t: -k1,1)",
+      "Bash(sqlite3 /Users/ludo/code/teimas_space/backend/data/virtual-office.db \"SELECT id, name, tmj_filename FROM offices;\")",
+      "Bash(sqlite3 /Users/ludo/code/teimas_space/backend/data/virtual-office.db \"SELECT id, label, x, y FROM desks WHERE office_id = 4;\")",
+      "Bash(sqlite3 /Users/ludo/code/teimas_space/backend/data/virtual-office.db \"SELECT COUNT\\(*\\) FROM desks WHERE office_id = 4;\")"
     ],
     "deny": [
       "Read(.env)",

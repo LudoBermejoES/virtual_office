@@ -6,13 +6,16 @@ type Tab = (typeof TABS)[number];
 
 let panelEl: HTMLDivElement | null = null;
 let editDesksCallback: ((officeId: number) => void) | null = null;
-let pickDeskCallback: ((onPicked: (deskId: number, deskLabel: string) => void) => void) | null = null;
+let pickDeskCallback: ((onPicked: (deskId: number, deskLabel: string) => void) => void) | null =
+  null;
 
 export function setEditDesksCallback(cb: (officeId: number) => void): void {
   editDesksCallback = cb;
 }
 
-export function setPickDeskCallback(cb: (onPicked: (deskId: number, deskLabel: string) => void) => void): void {
+export function setPickDeskCallback(
+  cb: (onPicked: (deskId: number, deskLabel: string) => void) => void,
+): void {
   pickDeskCallback = cb;
 }
 
@@ -790,8 +793,12 @@ function renderFijos(container: HTMLElement, preselectedDeskId?: number): void {
   container.innerHTML = '<p style="color:#8e92a8;font-size:10px">Cargando oficinas…</p>';
 
   Promise.all([
-    fetch(`${BASE_URL}/api/offices`, { credentials: "include" }).then((r) => r.json()) as Promise<{ id: number; name: string }[]>,
-    fetch(`${BASE_URL}/api/users`, { credentials: "include" }).then((r) => r.json()) as Promise<UserRow[]>,
+    fetch(`${BASE_URL}/api/offices`, { credentials: "include" }).then((r) => r.json()) as Promise<
+      { id: number; name: string }[]
+    >,
+    fetch(`${BASE_URL}/api/users`, { credentials: "include" }).then((r) => r.json()) as Promise<
+      UserRow[]
+    >,
   ])
     .then(([offices, users]) => {
       container.innerHTML = "";
@@ -978,10 +985,14 @@ function renderFijos(container: HTMLElement, preselectedDeskId?: number): void {
               loadFijos(parseInt(sel.value, 10));
             } else {
               assignBtn.textContent = "ERROR";
-              setTimeout(() => { assignBtn.textContent = "ASIGNAR"; }, 2000);
+              setTimeout(() => {
+                assignBtn.textContent = "ASIGNAR";
+              }, 2000);
             }
           })
-          .catch(() => { assignBtn.textContent = "ERROR"; });
+          .catch(() => {
+            assignBtn.textContent = "ERROR";
+          });
       });
       formWrap.appendChild(assignBtn);
       container.appendChild(formWrap);
@@ -1015,7 +1026,8 @@ function renderFijos(container: HTMLElement, preselectedDeskId?: number): void {
           .then((assignments: AssignmentRow[]) => {
             listContainer.innerHTML = "";
             if (assignments.length === 0) {
-              listContainer.innerHTML = '<p style="color:#8e92a8;font-size:10px">Sin asignaciones fijas.</p>';
+              listContainer.innerHTML =
+                '<p style="color:#8e92a8;font-size:10px">Sin asignaciones fijas.</p>';
               return;
             }
             for (const a of assignments) {
@@ -1044,8 +1056,13 @@ function renderFijos(container: HTMLElement, preselectedDeskId?: number): void {
                 cursor: "pointer",
               });
               delBtn.addEventListener("click", () => {
-                fetch(`${BASE_URL}/api/desks/${a.id}/fixed`, { method: "DELETE", credentials: "include" })
-                  .then((r) => { if (r.ok) loadFijos(officeId); })
+                fetch(`${BASE_URL}/api/desks/${a.id}/fixed`, {
+                  method: "DELETE",
+                  credentials: "include",
+                })
+                  .then((r) => {
+                    if (r.ok) loadFijos(officeId);
+                  })
                   .catch(() => {});
               });
               row.appendChild(delBtn);
@@ -1059,7 +1076,10 @@ function renderFijos(container: HTMLElement, preselectedDeskId?: number): void {
 
       sel.addEventListener("change", () => {
         const id = parseInt(sel.value, 10);
-        if (!isNaN(id)) { loadDesks(id); loadFijos(id); }
+        if (!isNaN(id)) {
+          loadDesks(id);
+          loadFijos(id);
+        }
       });
 
       const initialId = parseInt(sel.value, 10);

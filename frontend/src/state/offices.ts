@@ -27,7 +27,14 @@ export const officesStore = createStore<OfficesStore>()((set) => ({
   meEmail: "",
   meAvatarUrl: null,
   setList: (list, me) =>
-    set({ list, meId: me.id, meRole: me.role, meName: me.name, meEmail: me.email, meAvatarUrl: me.avatarUrl }),
+    set({
+      list,
+      meId: me.id,
+      meRole: me.role,
+      meName: me.name,
+      meEmail: me.email,
+      meAvatarUrl: me.avatarUrl,
+    }),
 }));
 
 export const VO_LAST_OFFICE_KEY = "vo_last_office";

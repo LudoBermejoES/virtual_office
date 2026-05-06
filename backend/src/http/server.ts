@@ -85,7 +85,11 @@ export async function buildServer({ db, googleVerifier, env, hub: hubOverride }:
         wildcard: false,
       });
       app.setNotFoundHandler((request, reply) => {
-        if (request.url.startsWith("/api/") || request.url.startsWith("/ws") || request.url.startsWith("/maps/")) {
+        if (
+          request.url.startsWith("/api/") ||
+          request.url.startsWith("/ws") ||
+          request.url.startsWith("/maps/")
+        ) {
           return reply.status(404).send({ reason: "not_found" });
         }
         return reply.sendFile("index.html");
