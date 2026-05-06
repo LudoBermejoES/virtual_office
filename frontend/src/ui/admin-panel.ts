@@ -902,7 +902,8 @@ function renderFijos(container: HTMLElement, preselectedDeskId?: number): void {
             gap: "8px",
             padding: "6px 8px",
             cursor: "pointer",
-            background: u.id === selectedUserId ? "#1a1a2e" : "transparent",
+            background: u.id === selectedUserId ? "#3a2050" : "transparent",
+            borderLeft: u.id === selectedUserId ? "3px solid #b66dff" : "3px solid transparent",
             borderBottom: "1px solid #1a1a2e",
           });
 
