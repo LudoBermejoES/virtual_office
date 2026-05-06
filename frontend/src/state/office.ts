@@ -43,6 +43,7 @@ export interface OfficeDetail {
   date: string;
   features: OfficeFeaturesPayload;
   npcs: NpcData[];
+  myFixedExceptionDeskId?: number | null;
 }
 
 export interface OfficeStore {

@@ -10,6 +10,7 @@ import * as officesRepo from "../../infra/repos/offices.js";
 import * as desksRepo from "../../infra/repos/desks.js";
 import * as bookingsRepo from "../../infra/repos/bookings.js";
 import * as fixedRepo from "../../infra/repos/fixed-assignments.js";
+import * as exceptionsRepo from "../../infra/repos/fixed-exceptions.js";
 import * as featuresRepo from "../../infra/repos/features.js";
 import * as npcsRepo from "../../infra/repos/npcs.js";
 import { officeRoom } from "../../infra/ws/hub.js";
@@ -359,6 +360,8 @@ export async function officesRoutes(
     for (const b of rows) dailyByDeskId.set(b.desk_id, b);
 
     const fixedRows = fixedRepo.listByOffice(db, officeId);
+    const exceptions = exceptionsRepo.listExceptionsByOfficeAndDate(db, officeId, date);
+    const skippedFixedIds = new Set(exceptions.map((e) => e.fixed_assignment_id));
 
     const bookings: Array<{
       id: number;
@@ -383,6 +386,7 @@ export async function officesRoutes(
       });
     }
     for (const f of fixedRows) {
+      if (skippedFixedIds.has(f.id)) continue;
       if (dailyByDeskId.has(f.desk_id)) continue;
       if (dailyByUserId.has(f.user_id)) continue;
       bookings.push({
@@ -395,6 +399,14 @@ export async function officesRoutes(
       });
     }
 
+    const myException = exceptionsRepo.findUserExceptionForDate(
+      db,
+      request.user!.id,
+      officeId,
+      date,
+    );
+    const myFixedExceptionDeskId = myException?.desk_id ?? null;
+
     const features = featuresRepo.listFeatures(db, officeId);
     const npcRows = npcsRepo.listNpcs(db, officeId);
     const npcs = npcRows.map(({ id, name, x, y, sprite }) => ({ id, name, x, y, sprite }));
@@ -403,9 +415,16 @@ export async function officesRoutes(
       animations: JSON.parse(t.animations_json) as unknown[],
     }));
 
-    return reply
-      .status(200)
-      .send({ office, tilesets: tilesetsWithAnimations, desks, bookings, date, features, npcs });
+    return reply.status(200).send({
+      office,
+      tilesets: tilesetsWithAnimations,
+      desks,
+      bookings,
+      date,
+      features,
+      npcs,
+      myFixedExceptionDeskId,
+    });
   });
 
   app.delete("/api/offices/:id", { preHandler: app.requireAdmin }, async (request, reply) => {

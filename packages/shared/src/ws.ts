@@ -10,6 +10,8 @@ export type WsServerMessage =
   | { type: "desk.released"; deskId: number; date: string }
   | { type: "desk.fixed"; deskId: number; user: WsPublicUser }
   | { type: "desk.unfixed"; deskId: number }
+  | { type: "desk.fixed_skipped"; deskId: number; userId: number; date: string }
+  | { type: "desk.fixed_unskipped"; deskId: number; userId: number; date: string }
   | { type: "office.updated"; officeId: number }
   | { type: "auth.expired" };
 
@@ -21,6 +23,8 @@ const KNOWN_SERVER_TYPES = [
   "desk.released",
   "desk.fixed",
   "desk.unfixed",
+  "desk.fixed_skipped",
+  "desk.fixed_unskipped",
   "office.updated",
   "auth.expired",
 ];

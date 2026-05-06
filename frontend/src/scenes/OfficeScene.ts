@@ -256,6 +256,12 @@ export class OfficeScene extends Phaser.Scene {
       void this.refreshSnapshot();
       return;
     }
+    if (msg.type === "desk.fixed_skipped" || msg.type === "desk.fixed_unskipped") {
+      if (msg.date === this.detail.date) {
+        void this.refreshSnapshot();
+      }
+      return;
+    }
 
     if (msg.type === "desk.booked" && msg.date === this.detail.date) {
       this.detail.bookings = this.detail.bookings.filter((b) => b.deskId !== msg.deskId);
@@ -414,7 +420,35 @@ export class OfficeScene extends Phaser.Scene {
 
     if (state === "fixed") {
       const b = this.detail.bookings.find((x) => x.deskId === desk.id);
+      const isMyFixed = b?.userId === this.meId;
+      const isAdmin = officesStore.getState().meRole === "admin";
+      if (isMyFixed) {
+        if (
+          window.confirm(`¿Hoy no vienes? Tu puesto fijo (${desk.label}) quedará libre para otros.`)
+        ) {
+          await this.skipFixedDay(desk);
+        }
+        return;
+      }
+      if (isAdmin) {
+        if (
+          window.confirm(
+            `¿Marcar que ${b?.user.name ?? "este usuario"} hoy no viene? Su puesto fijo (${desk.label}) quedará libre.`,
+          )
+        ) {
+          await this.skipFixedDay(desk);
+        }
+        return;
+      }
       this.showFeedback(`📌 Puesto fijo de ${b?.user.name ?? "otro usuario"}`);
+      return;
+    }
+
+    // Si este desk es mi fijo con excepción activa hoy, ofrecer deshacer
+    if (this.detail.myFixedExceptionDeskId === desk.id) {
+      if (window.confirm(`¿Vuelves hoy a tu puesto fijo (${desk.label})?`)) {
+        await this.unskipFixedDay(desk);
+      }
       return;
     }
     if (state === "occupied") {
@@ -451,6 +485,40 @@ export class OfficeScene extends Phaser.Scene {
       if (!window.confirm(`¿Reservar ${desk.label} el ${dateLabel}?`)) return;
     }
     await this.reserveDesk(desk);
+  }
+
+  private async skipFixedDay(desk: Desk): Promise<void> {
+    if (!this.detail) return;
+    const date = this.detail.date;
+    const res = await fetch(`${BASE_URL}/api/desks/${desk.id}/fixed/skip`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ date }),
+    });
+    if (res.ok) {
+      await this.refreshSnapshot();
+      return;
+    }
+    const err = (await res.json().catch(() => ({}))) as { reason?: string };
+    this.showFeedback(`Error: ${err.reason ?? res.status}`);
+  }
+
+  private async unskipFixedDay(desk: Desk): Promise<void> {
+    if (!this.detail) return;
+    const date = this.detail.date;
+    const res = await fetch(`${BASE_URL}/api/desks/${desk.id}/fixed/skip`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ date }),
+    });
+    if (res.ok || res.status === 204) {
+      await this.refreshSnapshot();
+      return;
+    }
+    const err = (await res.json().catch(() => ({}))) as { reason?: string };
+    this.showFeedback(`Error: ${err.reason ?? res.status}`);
   }
 
   private async reserveDesk(desk: Desk): Promise<void> {
