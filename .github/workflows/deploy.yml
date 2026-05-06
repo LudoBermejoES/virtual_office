@@ -75,7 +75,7 @@ jobs:
           ls -lh vo.tar.gz
 
       - name: Upload archive to server
-        uses: appleboy/scp-action@master
+        uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USERNAME }}
@@ -104,9 +104,7 @@ jobs:
           script: |
             set -e
 
-            # Load NVM and run as www-data via sudo
-            sudo -E -u www-data bash << 'OUTER_EOF'
-            set -e
+            # Load NVM (PM2 instalado bajo /var/www/.nvm como www-data)
             export NVM_DIR="/var/www/.nvm"
             [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
 
@@ -115,31 +113,30 @@ jobs:
             DATA_PATH="$DEPLOY_PATH/backend/data"
             LOGS_PATH="$DEPLOY_PATH/backend/logs"
 
-            # Backup current data
+            # Backup current persistent state
             if [ -d "$DEPLOY_PATH" ]; then
               echo "Creating backup at $BACKUP_PATH..."
-              mkdir -p "$BACKUP_PATH/backend"
-              [ -d "$DATA_PATH" ] && cp -r "$DATA_PATH" "$BACKUP_PATH/backend/data" 2>/dev/null || true
-              [ -d "$LOGS_PATH" ] && cp -r "$LOGS_PATH" "$BACKUP_PATH/backend/logs" 2>/dev/null || true
-              [ -f "$DEPLOY_PATH/.env" ] && cp "$DEPLOY_PATH/.env" "$BACKUP_PATH/.env"
+              sudo mkdir -p "$BACKUP_PATH/backend"
+              [ -d "$DATA_PATH" ] && sudo cp -r "$DATA_PATH" "$BACKUP_PATH/backend/data" 2>/dev/null || true
+              [ -d "$LOGS_PATH" ] && sudo cp -r "$LOGS_PATH" "$BACKUP_PATH/backend/logs" 2>/dev/null || true
+              [ -f "$DEPLOY_PATH/.env" ] && sudo cp "$DEPLOY_PATH/.env" "$BACKUP_PATH/.env"
             fi
 
-            # Stop PM2
+            # Stop PM2 process (running as www-data)
             echo "Stopping PM2..."
-            pm2 stop virtual-office 2>/dev/null || echo "Not running"
+            sudo -u www-data bash -c 'export NVM_DIR=/var/www/.nvm; . $NVM_DIR/nvm.sh; pm2 stop virtual-office 2>/dev/null || true'
 
-            # Clean old code, preserve data/logs/.env
-            mkdir -p "$DEPLOY_PATH"
+            # Clean old code preserving persistent dirs and .env
+            sudo mkdir -p "$DEPLOY_PATH"
             cd "$DEPLOY_PATH"
-            find . -mindepth 1 -maxdepth 1 \
+            sudo find . -mindepth 1 -maxdepth 1 \
               ! -name '.env' \
               ! -name 'backend' \
               -exec rm -rf {} + 2>/dev/null || true
 
-            # Within backend/, preserve data and logs
             if [ -d "$DEPLOY_PATH/backend" ]; then
               cd "$DEPLOY_PATH/backend"
-              find . -mindepth 1 -maxdepth 1 \
+              sudo find . -mindepth 1 -maxdepth 1 \
                 ! -name 'data' \
                 ! -name 'logs' \
                 -exec rm -rf {} + 2>/dev/null || true
@@ -147,26 +144,20 @@ jobs:
 
             # Extract new release
             echo "Extracting new version..."
-            tar -xzf /tmp/vo.tar.gz -C "$DEPLOY_PATH"
+            sudo tar -xzf /tmp/vo.tar.gz -C "$DEPLOY_PATH"
 
             # Ensure persistent dirs exist
-            mkdir -p "$DATA_PATH" "$LOGS_PATH" "$DATA_PATH/maps" "$DATA_PATH/backups"
+            sudo mkdir -p "$DATA_PATH" "$LOGS_PATH" "$DATA_PATH/maps" "$DATA_PATH/backups"
 
-            # Install production dependencies (workspace-aware)
-            echo "Installing production dependencies..."
-            cd "$DEPLOY_PATH"
-            pnpm install --prod --frozen-lockfile=false
-
-            # Write/refresh .env (only managed keys; preserves any custom keys not listed)
-            cd "$DEPLOY_PATH"
-            ENV_FILE=".env"
-            touch "$ENV_FILE"
+            # Write/refresh .env with managed keys
+            ENV_FILE="$DEPLOY_PATH/.env"
+            sudo touch "$ENV_FILE"
             update_env() {
               local key="$1"
               local val="$2"
               if [ -z "$val" ]; then return; fi
-              sed -i "/^${key}=/d" "$ENV_FILE"
-              echo "${key}=${val}" >> "$ENV_FILE"
+              sudo sed -i "/^${key}=/d" "$ENV_FILE"
+              echo "${key}=${val}" | sudo tee -a "$ENV_FILE" > /dev/null
             }
             update_env NODE_ENV production
             update_env PORT 8123
@@ -183,24 +174,40 @@ jobs:
             update_env ADMIN_EMAILS "$ADMIN_EMAILS"
             update_env PUBLIC_BASE_URL "$PUBLIC_BASE_URL"
             update_env SENTRY_DSN "$SENTRY_DSN"
-            chmod 600 "$ENV_FILE"
+            sudo chmod 600 "$ENV_FILE"
 
-            # Symlink backend/.env -> /var/www/teimas-space/.env so node --env-file picks it up
-            ln -sf "$DEPLOY_PATH/.env" "$DEPLOY_PATH/backend/.env"
+            # Symlink backend/.env -> /var/www/teimas-space/.env (node --env-file)
+            sudo ln -sf "$DEPLOY_PATH/.env" "$DEPLOY_PATH/backend/.env"
 
-            # Start/restart PM2
+            # Set ownership BEFORE installing deps (pnpm crea node_modules como el usuario que corre)
+            sudo chown -R www-data:www-data "$DEPLOY_PATH"
+            sudo chmod 750 "$DATA_PATH" "$LOGS_PATH"
+
+            # Install production dependencies as www-data (workspace-aware)
+            echo "Installing production dependencies..."
+            sudo -u www-data bash -c "
+              export NVM_DIR=/var/www/.nvm
+              . \$NVM_DIR/nvm.sh
+              cd $DEPLOY_PATH
+              pnpm install --prod --frozen-lockfile=false
+            "
+
+            # Start/restart PM2 as www-data
             echo "Starting PM2..."
-            cd "$DEPLOY_PATH/backend"
-            pm2 restart virtual-office --update-env || pm2 start ecosystem.config.cjs --env production
-            pm2 save
+            sudo -u www-data bash -c "
+              export NVM_DIR=/var/www/.nvm
+              . \$NVM_DIR/nvm.sh
+              cd $DEPLOY_PATH/backend
+              pm2 restart virtual-office --update-env || pm2 start ecosystem.config.cjs --env production
+              pm2 save
+            "
 
             # Cleanup tarball
-            rm -f /tmp/vo.tar.gz
+            sudo rm -f /tmp/vo.tar.gz
 
             # Rotate backups (keep last 3)
             cd /var/www
-            ls -td teimas-space-backup-* 2>/dev/null | tail -n +4 | xargs rm -rf 2>/dev/null || true
+            sudo bash -c 'ls -td teimas-space-backup-* 2>/dev/null | tail -n +4 | xargs rm -rf 2>/dev/null' || true
 
             echo "Deployment complete!"
-            pm2 list
-            OUTER_EOF
+            sudo -u www-data bash -c 'export NVM_DIR=/var/www/.nvm; . $NVM_DIR/nvm.sh; pm2 list'
