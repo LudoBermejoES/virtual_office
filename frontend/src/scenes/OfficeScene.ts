@@ -338,23 +338,24 @@ export class OfficeScene extends Phaser.Scene {
     yOffset: number = 0,
   ): void {
     const ay = desk.y + yOffset;
+    const onClick = (): void => void this.handleDeskClick(desk);
     if (!user.avatar_url) {
-      const visual = placeFallback(this, desk.x, ay, user);
+      const visual = placeFallback(this, desk.x, ay, user, onClick);
       this.deskAvatars.set(desk.id, visual);
       return;
     }
     const key = `avatar:${user.id}`;
     if (this.textures.exists(key)) {
-      const visual = placeAvatar(this, key, desk.x, ay);
+      const visual = placeAvatar(this, key, desk.x, ay, onClick);
       this.deskAvatars.set(desk.id, visual);
       return;
     }
     if (this.avatarStatus.get(user.id) === "loading") {
-      const fb = placeFallback(this, desk.x, ay, user);
+      const fb = placeFallback(this, desk.x, ay, user, onClick);
       this.deskAvatars.set(desk.id, fb);
       return;
     }
-    const fallback = placeFallback(this, desk.x, ay, user);
+    const fallback = placeFallback(this, desk.x, ay, user, onClick);
     this.deskAvatars.set(desk.id, fallback);
     this.avatarStatus.set(user.id, "loading");
     this.load.image(key, user.avatar_url);
@@ -362,7 +363,7 @@ export class OfficeScene extends Phaser.Scene {
       this.avatarStatus.set(user.id, "ready");
       const cur = this.deskAvatars.get(desk.id);
       if (cur) cur.destroy();
-      const visual = placeAvatar(this, key, desk.x, ay);
+      const visual = placeAvatar(this, key, desk.x, ay, onClick);
       this.deskAvatars.set(desk.id, visual);
     });
     this.load.once("loaderror", () => {

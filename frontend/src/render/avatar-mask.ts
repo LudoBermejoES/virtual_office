@@ -17,6 +17,7 @@ export function placeAvatar(
   textureKey: string,
   x: number,
   y: number,
+  onClick?: () => void,
 ): AvatarVisual {
   const circularKey = `${textureKey}:circle`;
 
@@ -36,6 +37,10 @@ export function placeAvatar(
   }
 
   const photo = scene.add.image(x, y, circularKey);
+  if (onClick) {
+    photo.setInteractive({ useHandCursor: true });
+    photo.on("pointerdown", onClick);
+  }
   return {
     destroy() {
       photo.destroy();
@@ -52,6 +57,7 @@ export function placeFallback(
   x: number,
   y: number,
   user: { id: number; name: string },
+  onClick?: () => void,
 ): AvatarVisual {
   const color = rgbToInt(hslToRgb(colorForUser(user.id)));
   const circle = scene.add.circle(x, y, AVATAR_RADIUS, color, 1);
@@ -63,6 +69,12 @@ export function placeFallback(
       color: "#ffffff",
     })
     .setOrigin(0.5);
+  if (onClick) {
+    circle.setInteractive({ useHandCursor: true });
+    circle.on("pointerdown", onClick);
+    text.setInteractive({ useHandCursor: true });
+    text.on("pointerdown", onClick);
+  }
   return {
     destroy() {
       circle.destroy();
