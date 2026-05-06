@@ -59,6 +59,38 @@ export function importDesksFromTiled(
           label: candidate.label,
           reason: "label_taken_by_manual",
         });
+        continue;
+      }
+      // Tiled-sourced: actualizar coordenadas si han cambiado
+      if (existing.x !== candidate.x || existing.y !== candidate.y) {
+        const otherPositions = positions.filter(
+          (p) => !(p.x === existing.x && p.y === existing.y),
+        );
+        const validation = validateDeskPlacement(
+          candidate.x,
+          candidate.y,
+          bounds,
+          otherPositions,
+        );
+        if (!validation.ok) {
+          warnings.push({
+            objectId: candidate.objectId,
+            label: candidate.label,
+            reason: validation.reason,
+          });
+          continue;
+        }
+        const updated = desksRepo.updateDesk(db, existing.id, {
+          x: candidate.x,
+          y: candidate.y,
+        });
+        if (updated) {
+          // Reemplaza la posición vieja en el array de bookkeeping
+          const idx = positions.findIndex((p) => p.x === existing.x && p.y === existing.y);
+          if (idx >= 0) positions[idx] = { x: updated.x, y: updated.y };
+          existingByLabel.set(candidate.label, updated);
+          imported += 1;
+        }
       }
       continue;
     }
