@@ -37,6 +37,7 @@ vi.mock("../../../src/state/ui.js", () => ({
       today: "2026-01-01",
       canPrev: () => false,
       canNext: () => false,
+      resetToToday: () => {},
     }),
     subscribe: () => () => {},
   },
@@ -54,6 +55,7 @@ vi.mock("../../../src/ui/admin-panel.js", () => ({
   mountAdminPanel: vi.fn(),
   unmountAdminPanel: vi.fn(),
   setEditDesksCallback: vi.fn(),
+  setPickDeskCallback: vi.fn(),
 }));
 
 vi.mock("@virtual-office/shared", () => ({

@@ -5,6 +5,7 @@ function makeScene() {
   const objects: { type: string; x: number; y: number; label?: string }[] = [];
 
   const makeText = (x: number, y: number, label: string) => {
+    const listeners: Record<string, ((...args: unknown[]) => void)[]> = {};
     const obj = {
       type: "text",
       x,
@@ -16,7 +17,16 @@ function makeScene() {
         return this;
       },
       setScrollFactor() { return this; },
+      setInteractive() { return this; },
       setY(newY: number) { this.y = newY; return this; },
+      on(event: string, fn: (...args: unknown[]) => void) {
+        listeners[event] = listeners[event] ?? [];
+        listeners[event].push(fn);
+        return this;
+      },
+      emit(event: string, ...args: unknown[]) {
+        (listeners[event] ?? []).forEach((fn) => fn(...args));
+      },
     };
     objects.push(obj);
     return obj;
@@ -30,6 +40,7 @@ function makeScene() {
       y,
       setOrigin() { return this; },
       setInteractive() { return this; },
+      setVisible() { return this; },
       on(event: string, fn: (...args: unknown[]) => void) {
         listeners[event] = listeners[event] ?? [];
         listeners[event].push(fn);
@@ -70,21 +81,21 @@ describe("arcadeButton", async () => {
 
   it("el texto baja 2px en pointerdown y sube en pointerup", () => {
     const scene = makeScene();
-    const { frame, text } = arcadeButton(scene as never, 100, 50, "TEST", () => {});
+    const { text } = arcadeButton(scene as never, 100, 50, "TEST", () => {});
     const initialY = (text as { y: number }).y;
 
-    (frame as { emit: (e: string) => void }).emit("pointerdown");
+    (text as { emit: (e: string) => void }).emit("pointerdown");
     expect((text as { y: number }).y).toBe(initialY + 2);
 
-    (frame as { emit: (e: string) => void }).emit("pointerup");
+    (text as { emit: (e: string) => void }).emit("pointerup");
     expect((text as { y: number }).y).toBe(initialY);
   });
 
   it("onClick se llama en pointerup", () => {
     const scene = makeScene();
     const onClick = vi.fn();
-    const { frame } = arcadeButton(scene as never, 100, 50, "BTN", onClick);
-    (frame as { emit: (e: string) => void }).emit("pointerup");
+    const { text } = arcadeButton(scene as never, 100, 50, "BTN", onClick);
+    (text as { emit: (e: string) => void }).emit("pointerup");
     expect(onClick).toHaveBeenCalledOnce();
   });
 });
