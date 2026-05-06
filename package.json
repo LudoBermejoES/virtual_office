@@ -6,17 +6,19 @@
   "workspaces": [
     "backend",
     "frontend",
-    "packages/*"
+    "packages/*",
+    "tools/*"
   ],
   "scripts": {
     "dev": "pnpm --parallel -r dev",
     "build": "pnpm --filter shared build && pnpm --filter backend build && pnpm --filter frontend build",
     "start": "pnpm --filter backend start",
-    "test": "pnpm --filter backend test && pnpm --filter frontend test",
-    "typecheck": "pnpm --filter shared typecheck && pnpm --filter backend typecheck && pnpm --filter frontend typecheck",
-    "lint": "eslint 'backend/src/**/*.ts' 'frontend/src/**/*.ts' 'packages/shared/src/**/*.ts'",
-    "format": "prettier --write 'backend/src/**/*.ts' 'frontend/src/**/*.ts' 'packages/shared/src/**/*.ts'",
-    "format:check": "prettier --check 'backend/src/**/*.ts' 'frontend/src/**/*.ts' 'packages/shared/src/**/*.ts'"
+    "test": "pnpm --filter backend test && pnpm --filter frontend test && pnpm --filter @virtual-office/tmj-optimize test",
+    "typecheck": "pnpm --filter shared typecheck && pnpm --filter backend typecheck && pnpm --filter frontend typecheck && pnpm --filter @virtual-office/tmj-optimize typecheck",
+    "lint": "eslint 'backend/src/**/*.ts' 'frontend/src/**/*.ts' 'packages/shared/src/**/*.ts' 'tools/*/src/**/*.ts'",
+    "format": "prettier --write 'backend/src/**/*.ts' 'frontend/src/**/*.ts' 'packages/shared/src/**/*.ts' 'tools/*/src/**/*.ts'",
+    "format:check": "prettier --check 'backend/src/**/*.ts' 'frontend/src/**/*.ts' 'packages/shared/src/**/*.ts' 'tools/*/src/**/*.ts'",
+    "tmj-optimize": "pnpm --filter @virtual-office/tmj-optimize exec tsx src/cli.ts"
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^8.59.1",

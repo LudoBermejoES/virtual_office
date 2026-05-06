@@ -72,6 +72,8 @@ Una oficina virtual con estética videojuego para que el equipo escoja su puesto
 │   │   └── ui/                ← admin panel, day navigation, sound
 │   └── tests/{unit,e2e}/
 ├── packages/shared/           ← tipos y constantes compartidas
+├── tools/                     ← utilidades CLI internas
+│   └── tmj-optimize/          ← optimiza bundles Tiled (.tmj + WebP único)
 ├── doc/
 │   ├── tests/README.md        ← estrategia TDD
 │   ├── be/README.md           ← arquitectura backend
