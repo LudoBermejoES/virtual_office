@@ -81,4 +81,4 @@ El ciclo TDD por tarea: escribe el test (red) → implementa lo mínimo (green) 
 - [x] 3.1 `pnpm test` (unit + integration) en verde.
 - [x] 3.2 `pnpm e2e:chromium` en verde (10 tests nuevos; 3 fallos preexistentes no relacionados).
 - [x] 3.3 `openspec validate --all --strict` en verde.
-- [ ] 3.4 Prueba manual: admin puede crear oficina, invitar usuario, gestionar puestos desde el panel.
+- [x] 3.4 Prueba manual: admin puede crear oficina, invitar usuario, gestionar puestos desde el panel.
