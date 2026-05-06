@@ -787,7 +787,11 @@ function buildInvRow(
 
 type UserRow = { id: number; name: string; email: string; avatarUrl?: string | null };
 type DeskRow = { id: number; label: string };
-type AssignmentRow = { id: number; desk: { label: string }; user: { name: string; email: string } };
+type AssignmentRow = {
+  id: number;
+  desk: { id: number; label: string };
+  user: { name: string; email: string };
+};
 
 function renderFijos(container: HTMLElement, preselectedDeskId?: number): void {
   container.innerHTML = '<p style="color:#8e92a8;font-size:10px">Cargando oficinas…</p>';
@@ -1057,7 +1061,7 @@ function renderFijos(container: HTMLElement, preselectedDeskId?: number): void {
                 cursor: "pointer",
               });
               delBtn.addEventListener("click", () => {
-                fetch(`${BASE_URL}/api/desks/${a.id}/fixed`, {
+                fetch(`${BASE_URL}/api/desks/${a.desk.id}/fixed`, {
                   method: "DELETE",
                   credentials: "include",
                 })
