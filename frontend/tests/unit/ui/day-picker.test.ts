@@ -84,7 +84,8 @@ function makeEl(tagName = "div"): FakeEl {
     },
     click() {
       const fns = el._listeners["click"] ?? [];
-      for (const fn of fns) fn(undefined);
+      const fakeEvent = { stopPropagation: () => {}, preventDefault: () => {} };
+      for (const fn of fns) fn(fakeEvent);
     },
     querySelector(sel: string) {
       return el.querySelectorAll(sel)[0] ?? null;
@@ -120,7 +121,7 @@ function matches(el: FakeEl, sel: string): boolean {
   return el.tagName === sel;
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   body = makeEl("body");
   for (const k of Object.keys(documentListeners)) delete documentListeners[k];
 
@@ -140,6 +141,10 @@ beforeEach(() => {
       if (idx >= 0) list.splice(idx, 1);
     },
   };
+
+  // Asegurar estado limpio del módulo entre tests
+  const mod = await import("../../../src/ui/day-picker.js");
+  mod.unmountDayPicker();
 });
 
 function dispatch(event: string, payload: unknown): void {

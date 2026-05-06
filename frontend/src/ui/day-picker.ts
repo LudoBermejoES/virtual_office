@@ -56,6 +56,14 @@ export function mountDayPicker(anchor?: MountAnchor): void {
     overlay.style.transform = "translateX(-50%)";
   }
 
+  // Detener cualquier evento de puntero dentro del overlay para que no llegue al canvas Phaser
+  const stopBubble = (e: Event): void => {
+    e.stopPropagation();
+  };
+  overlay.addEventListener("pointerdown", stopBubble);
+  overlay.addEventListener("mousedown", stopBubble);
+  overlay.addEventListener("click", stopBubble);
+
   rerender();
   document.body.appendChild(overlay);
 
@@ -184,7 +192,8 @@ function buildCell(cell: DayCell, selectedIso: string): HTMLElement {
     el.classList.add("day-picker__cell--out");
     el.disabled = true;
   } else {
-    el.addEventListener("click", () => {
+    el.addEventListener("click", (e) => {
+      e.stopPropagation();
       uiStore.getState().setDate(cell.iso);
       unmountDayPicker();
     });
