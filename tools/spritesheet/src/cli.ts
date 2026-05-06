@@ -1,43 +1,54 @@
 #!/usr/bin/env node
 import { runPipeline } from "./pipeline.js";
+import type { Mode } from "./mode-detection.js";
 
 interface CliArgs {
   inputDir: string;
-  outputImage: string;
+  output: string;
   tile: number;
   duration: number;
   webp: boolean;
   recursive: boolean;
   skipInvalid: boolean;
+  forceMode?: Mode;
+  frameSizesPath?: string;
   help: boolean;
   version: boolean;
 }
 
-const VERSION = "0.1.0";
+const VERSION = "0.2.0";
 
 const HELP = `spritesheet ${VERSION}
 
 Uso:
-  spritesheet <input-dir> <output.png> [opciones]
+  spritesheet <input-dir> <output> [opciones]
 
-Apila todos los PNGs del directorio (cada uno una tira horizontal de frames
-de tamaño tile×tile) en un único spritesheet vertical y genera un .tsx de
-Tiled con una animación por cada PNG fuente.
+Detecta automáticamente el modo según los tamaños de los PNGs:
+  - Modo atlas: todos los frames son del mismo tamaño cuadrado.
+    Output: <output>.png + <output>.tsx (un único atlas).
+  - Modo collection: tamaños mezclados.
+    Output: <output>.tsx (Image Collection) + <output>_assets/ con copias.
+
+Si <output> termina en .png/.webp se fuerza atlas; si termina en .tsx se
+fuerza collection. También puedes usar --atlas o --collection.
 
 Opciones:
-  --tile N           Tamaño de frame cuadrado (default: 48)
+  --tile N           Tamaño de frame cuadrado para validación inicial (default: 48)
   --duration N       ms por frame en la animación (default: 200)
-  --webp             Salida WebP lossless (default: PNG)
-  --recursive        Recorrer subdirectorios (default: solo top-level)
+  --webp             Atlas en WebP lossless (solo modo atlas)
+  --recursive        Recorrer subdirectorios
   --skip-invalid     Saltar PNGs que no validan en lugar de abortar
-  --help, -h         Esta ayuda
-  --version, -v      Imprime versión
+  --collection       Forzar modo Image Collection
+  --atlas            Forzar modo atlas (aborta si tamaños mezclados)
+  --frame-sizes PATH Manifest JSON con frame_width/frame_height por filename
+  --help, -h         Ayuda
+  --version, -v      Versión
 `;
 
 export function parseArgs(argv: string[]): CliArgs {
   const args: CliArgs = {
     inputDir: "",
-    outputImage: "",
+    output: "",
     tile: 48,
     duration: 200,
     webp: false,
@@ -86,6 +97,20 @@ export function parseArgs(argv: string[]): CliArgs {
       args.skipInvalid = true;
       continue;
     }
+    if (arg === "--collection") {
+      args.forceMode = "collection";
+      continue;
+    }
+    if (arg === "--atlas") {
+      args.forceMode = "atlas";
+      continue;
+    }
+    if (arg === "--frame-sizes") {
+      const next = argv[++i];
+      if (!next) throw new Error("missing_frame_sizes_path");
+      args.frameSizesPath = next;
+      continue;
+    }
     if (arg.startsWith("--")) {
       throw new Error(`unknown_flag: ${arg}`);
     }
@@ -93,9 +118,17 @@ export function parseArgs(argv: string[]): CliArgs {
   }
 
   if (positionals[0]) args.inputDir = positionals[0];
-  if (positionals[1]) args.outputImage = positionals[1];
+  if (positionals[1]) args.output = positionals[1];
   if (positionals.length > 2) {
     throw new Error(`unexpected_args: ${positionals.slice(2).join(" ")}`);
+  }
+
+  // Inferir modo por extensión del output si no se forzó
+  if (!args.forceMode && args.output) {
+    if (args.output.endsWith(".tsx")) args.forceMode = "collection";
+    else if (args.output.endsWith(".png") || args.output.endsWith(".webp")) {
+      args.forceMode = "atlas";
+    }
   }
 
   return args;
@@ -118,7 +151,7 @@ export async function main(argv: string[]): Promise<number> {
     process.stdout.write(`${VERSION}\n`);
     return 0;
   }
-  if (!args.inputDir || !args.outputImage) {
+  if (!args.inputDir || !args.output) {
     process.stderr.write(`falta input-dir o output\n\n${HELP}`);
     return 1;
   }
@@ -126,21 +159,29 @@ export async function main(argv: string[]): Promise<number> {
   try {
     const report = await runPipeline({
       inputDir: args.inputDir,
-      outputImage: args.outputImage,
+      output: args.output,
       tile: args.tile,
       duration: args.duration,
       webp: args.webp,
       recursive: args.recursive,
       skipInvalid: args.skipInvalid,
+      ...(args.forceMode !== undefined ? { forceMode: args.forceMode } : {}),
+      ...(args.frameSizesPath !== undefined ? { frameSizesPath: args.frameSizesPath } : {}),
     });
     const kb = (report.outputBytes / 1024).toFixed(1);
     const lines = [
-      `PNGs procesados: ${report.pngCount} → ${report.rowCount} filas/strips`,
+      `Modo: ${report.mode}`,
+      `PNGs procesados: ${report.pngCount} → ${report.tileCount} tiles/strips`,
       `Frames totales: ${report.framesTotal}`,
       `Animaciones: ${report.animations} (+ ${report.staticTiles} tiles estáticos)`,
-      `Spritesheet: ${report.outputImagePath} (${kb} KB)`,
-      `Tileset: ${report.outputTsxPath}`,
     ];
+    if (report.outputImagePath) {
+      lines.push(`Atlas: ${report.outputImagePath} (${kb} KB)`);
+    }
+    if (report.assetsDir) {
+      lines.push(`Assets: ${report.assetsDir}/`);
+    }
+    lines.push(`Tileset: ${report.outputTsxPath}`);
     if (report.skipped.length > 0) {
       lines.push(`Saltados: ${report.skipped.length}`);
       for (const s of report.skipped.slice(0, 10)) {

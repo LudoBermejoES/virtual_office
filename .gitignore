@@ -136,3 +136,7 @@ lerna-debug.log*
 # ──────────────────────────────────────────────────────────────────
 .claude/settings.local.json
 .claude/.cache/
+
+# Outputs de tools/spritesheet en modo collection: la subcarpeta `_assets/`
+# duplica los PNGs originales (ya están en mapas/spritesheets/). El .tsx sí se commitea.
+mapas/*_assets/
