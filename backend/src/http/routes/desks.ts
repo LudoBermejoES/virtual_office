@@ -63,15 +63,8 @@ export function importDesksFromTiled(
       }
       // Tiled-sourced: actualizar coordenadas si han cambiado
       if (existing.x !== candidate.x || existing.y !== candidate.y) {
-        const otherPositions = positions.filter(
-          (p) => !(p.x === existing.x && p.y === existing.y),
-        );
-        const validation = validateDeskPlacement(
-          candidate.x,
-          candidate.y,
-          bounds,
-          otherPositions,
-        );
+        const otherPositions = positions.filter((p) => !(p.x === existing.x && p.y === existing.y));
+        const validation = validateDeskPlacement(candidate.x, candidate.y, bounds, otherPositions);
         if (!validation.ok) {
           warnings.push({
             objectId: candidate.objectId,
