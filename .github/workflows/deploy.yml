@@ -1,0 +1,208 @@
+name: Deploy Virtual Office
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm format:check
+      - name: Tests backend
+        run: SESSION_SECRET="ci-test-secret-al-menos-32-caracteres" pnpm vitest run
+        working-directory: backend
+      - name: Tests frontend
+        run: pnpm vitest run
+        working-directory: frontend
+
+  build-and-deploy:
+    name: Build & Deploy
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build all
+        env:
+          VITE_GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+        run: pnpm build
+
+      - name: Create deployment archive
+        run: |
+          mkdir -p /tmp/vo-deploy/backend /tmp/vo-deploy/frontend /tmp/vo-deploy/packages/shared
+
+          # Backend: compiled output + package.json + ecosystem
+          cp -r backend/dist /tmp/vo-deploy/backend/dist
+          cp backend/package.json /tmp/vo-deploy/backend/package.json
+          cp backend/ecosystem.config.cjs /tmp/vo-deploy/backend/ecosystem.config.cjs
+
+          # Frontend: vite build output
+          cp -r frontend/dist /tmp/vo-deploy/frontend/dist
+          cp frontend/package.json /tmp/vo-deploy/frontend/package.json
+
+          # Shared package (compiled)
+          cp -r packages/shared/dist /tmp/vo-deploy/packages/shared/dist
+          cp packages/shared/package.json /tmp/vo-deploy/packages/shared/package.json
+
+          # Workspace root
+          cp package.json pnpm-lock.yaml pnpm-workspace.yaml /tmp/vo-deploy/
+
+          cd /tmp/vo-deploy
+          tar -czf $GITHUB_WORKSPACE/vo.tar.gz .
+
+          cd $GITHUB_WORKSPACE
+          ls -lh vo.tar.gz
+
+      - name: Upload archive to server
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT }}
+          source: "vo.tar.gz"
+          target: "/tmp/"
+
+      - name: Deploy on server
+        uses: appleboy/ssh-action@master
+        env:
+          SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+          SESSION_SECRET_PREVIOUS: ${{ secrets.SESSION_SECRET_PREVIOUS }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          TEIMAS_DOMAINS: ${{ secrets.TEIMAS_DOMAINS }}
+          ADMIN_EMAILS: ${{ secrets.ADMIN_EMAILS }}
+          PUBLIC_BASE_URL: ${{ secrets.PUBLIC_BASE_URL }}
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT }}
+          envs: SESSION_SECRET,SESSION_SECRET_PREVIOUS,GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET,TEIMAS_DOMAINS,ADMIN_EMAILS,PUBLIC_BASE_URL,SENTRY_DSN
+          script: |
+            set -e
+
+            # Load NVM and run as www-data via sudo
+            sudo -E -u www-data bash << 'OUTER_EOF'
+            set -e
+            export NVM_DIR="/var/www/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+
+            DEPLOY_PATH="/var/www/teimas-space"
+            BACKUP_PATH="/var/www/teimas-space-backup-$(date +%Y%m%d-%H%M%S)"
+            DATA_PATH="$DEPLOY_PATH/backend/data"
+            LOGS_PATH="$DEPLOY_PATH/backend/logs"
+
+            # Backup current data
+            if [ -d "$DEPLOY_PATH" ]; then
+              echo "Creating backup at $BACKUP_PATH..."
+              mkdir -p "$BACKUP_PATH/backend"
+              [ -d "$DATA_PATH" ] && cp -r "$DATA_PATH" "$BACKUP_PATH/backend/data" 2>/dev/null || true
+              [ -d "$LOGS_PATH" ] && cp -r "$LOGS_PATH" "$BACKUP_PATH/backend/logs" 2>/dev/null || true
+              [ -f "$DEPLOY_PATH/.env" ] && cp "$DEPLOY_PATH/.env" "$BACKUP_PATH/.env"
+            fi
+
+            # Stop PM2
+            echo "Stopping PM2..."
+            pm2 stop virtual-office 2>/dev/null || echo "Not running"
+
+            # Clean old code, preserve data/logs/.env
+            mkdir -p "$DEPLOY_PATH"
+            cd "$DEPLOY_PATH"
+            find . -mindepth 1 -maxdepth 1 \
+              ! -name '.env' \
+              ! -name 'backend' \
+              -exec rm -rf {} + 2>/dev/null || true
+
+            # Within backend/, preserve data and logs
+            if [ -d "$DEPLOY_PATH/backend" ]; then
+              cd "$DEPLOY_PATH/backend"
+              find . -mindepth 1 -maxdepth 1 \
+                ! -name 'data' \
+                ! -name 'logs' \
+                -exec rm -rf {} + 2>/dev/null || true
+            fi
+
+            # Extract new release
+            echo "Extracting new version..."
+            tar -xzf /tmp/vo.tar.gz -C "$DEPLOY_PATH"
+
+            # Ensure persistent dirs exist
+            mkdir -p "$DATA_PATH" "$LOGS_PATH" "$DATA_PATH/maps" "$DATA_PATH/backups"
+
+            # Install production dependencies (workspace-aware)
+            echo "Installing production dependencies..."
+            cd "$DEPLOY_PATH"
+            pnpm install --prod --frozen-lockfile=false
+
+            # Write/refresh .env (only managed keys; preserves any custom keys not listed)
+            cd "$DEPLOY_PATH"
+            ENV_FILE=".env"
+            touch "$ENV_FILE"
+            update_env() {
+              local key="$1"
+              local val="$2"
+              if [ -z "$val" ]; then return; fi
+              sed -i "/^${key}=/d" "$ENV_FILE"
+              echo "${key}=${val}" >> "$ENV_FILE"
+            }
+            update_env NODE_ENV production
+            update_env PORT 8123
+            update_env LOG_LEVEL info
+            update_env DB_PATH "$DATA_PATH/virtual-office.db"
+            update_env OFFICE_MAPS_DIR "$DATA_PATH/maps"
+            update_env VO_BACKUP_DIR "$DATA_PATH/backups"
+            update_env FRONTEND_DIST_DIR "$DEPLOY_PATH/frontend/dist"
+            update_env SESSION_SECRET "$SESSION_SECRET"
+            update_env SESSION_SECRET_PREVIOUS "$SESSION_SECRET_PREVIOUS"
+            update_env GOOGLE_CLIENT_ID "$GOOGLE_CLIENT_ID"
+            update_env GOOGLE_CLIENT_SECRET "$GOOGLE_CLIENT_SECRET"
+            update_env TEIMAS_DOMAINS "$TEIMAS_DOMAINS"
+            update_env ADMIN_EMAILS "$ADMIN_EMAILS"
+            update_env PUBLIC_BASE_URL "$PUBLIC_BASE_URL"
+            update_env SENTRY_DSN "$SENTRY_DSN"
+            chmod 600 "$ENV_FILE"
+
+            # Symlink backend/.env -> /var/www/teimas-space/.env so node --env-file picks it up
+            ln -sf "$DEPLOY_PATH/.env" "$DEPLOY_PATH/backend/.env"
+
+            # Start/restart PM2
+            echo "Starting PM2..."
+            cd "$DEPLOY_PATH/backend"
+            pm2 restart virtual-office --update-env || pm2 start ecosystem.config.cjs --env production
+            pm2 save
+
+            # Cleanup tarball
+            rm -f /tmp/vo.tar.gz
+
+            # Rotate backups (keep last 3)
+            cd /var/www
+            ls -td teimas-space-backup-* 2>/dev/null | tail -n +4 | xargs rm -rf 2>/dev/null || true
+
+            echo "Deployment complete!"
+            pm2 list
+            OUTER_EOF

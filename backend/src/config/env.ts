@@ -37,6 +37,8 @@ const envSchema = z.object({
   MAX_TMJ_BYTES: z.coerce.number().int().positive().default(1_048_576),
   MAX_TILESET_BYTES: z.coerce.number().int().positive().default(2_097_152),
   MAX_MAP_TOTAL_BYTES: z.coerce.number().int().positive().default(10_485_760),
+
+  FRONTEND_DIST_DIR: z.string().optional().default(""),
 });
 
 export type Env = z.infer<typeof envSchema>;

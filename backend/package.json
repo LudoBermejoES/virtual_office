@@ -19,6 +19,7 @@
     "@fastify/cors": "^10.0.2",
     "@fastify/multipart": "^9.0.3",
     "@fastify/rate-limit": "^10.2.2",
+    "@fastify/static": "^9.1.3",
     "@fastify/websocket": "^11.0.2",
     "@sentry/node": "^9.18.0",
     "@virtual-office/shared": "workspace:*",

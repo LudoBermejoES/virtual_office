@@ -1,8 +1,11 @@
 import Fastify from "fastify";
+import { resolve } from "node:path";
+import { existsSync } from "node:fs";
 import cookie from "@fastify/cookie";
 import rateLimit from "@fastify/rate-limit";
 import multipart from "@fastify/multipart";
 import websocket from "@fastify/websocket";
+import staticPlugin from "@fastify/static";
 import type { DatabaseSync } from "node:sqlite";
 import type { Env } from "../config/env.js";
 import { errorHandler } from "./plugins/error-handler.js";
@@ -73,6 +76,22 @@ export async function buildServer({ db, googleVerifier, env, hub: hubOverride }:
       done(err as Error, undefined);
     }
   });
+
+  if (env.FRONTEND_DIST_DIR) {
+    const distRoot = resolve(env.FRONTEND_DIST_DIR);
+    if (existsSync(distRoot)) {
+      await app.register(staticPlugin, {
+        root: distRoot,
+        wildcard: false,
+      });
+      app.setNotFoundHandler((request, reply) => {
+        if (request.url.startsWith("/api/") || request.url.startsWith("/ws") || request.url.startsWith("/maps/")) {
+          return reply.status(404).send({ reason: "not_found" });
+        }
+        return reply.sendFile("index.html");
+      });
+    }
+  }
 
   return app;
 }
