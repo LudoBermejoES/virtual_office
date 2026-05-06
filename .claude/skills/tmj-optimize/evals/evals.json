@@ -1,0 +1,23 @@
+{
+  "skill_name": "tmj-optimize",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Acabo de subir un mapa nuevo a `mapas/teimas.tmj` con su tileset `Office.png` (768x2544, ~130KB). En la app la primera carga del mapa va lenta y el frontend descarga toda la imagen aunque solo uso un puñado de tiles. ¿Puedes optimizarlo? Quiero ver cuántos tiles uso realmente y que el bundle final pese lo menos posible.",
+      "expected_output": "Ejecuta `pnpm tmj-optimize mapas/teimas.tmj`, reporta los números (tiles totales, usados, reducción, tamaño WebP) y deja `mapas/teimas.optimized.tmj` y `.webp` generados. Idealmente menciona el siguiente paso (subir vía panel admin).",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Optimicé un mapa con tu utilidad y lo subí al panel de admin. La app carga sin errores pero el mapa se ve completamente vacío, transparente, ningún tile aparece. El TMJ original sí se veía bien. ¿Qué pasa?",
+      "expected_output": "Diagnostica el problema conocido: `tilesets[0].name` debe coincidir con el basename del fichero de imagen porque el frontend Phaser hace `addTilesetImage(basename(image_filename))`. Si el TMJ tiene `name: \"atlas\"` o cualquier valor que no sea el basename, Phaser falla silenciosamente. Sugiere regenerar con la versión actual de la herramienta o explicar cómo editar manualmente el `name`.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Estoy intentando optimizar `data/mi_oficina.tmj` pero me da el error `external_tileset_not_supported: tileset.tsx`. ¿Cómo lo arreglo?",
+      "expected_output": "Explica que el TMJ referencia un tileset externo .tsx y que la herramienta solo soporta tilesets embebidos. Indica el paso en Tiled: `Map → Convert to embedded` (o similar) y volver a guardar el .tmj. Ofrece reintentar después.",
+      "files": []
+    }
+  ]
+}
