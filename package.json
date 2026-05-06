@@ -13,12 +13,13 @@
     "dev": "pnpm --parallel -r dev",
     "build": "pnpm --filter shared build && pnpm --filter backend build && pnpm --filter frontend build",
     "start": "pnpm --filter backend start",
-    "test": "pnpm --filter backend test && pnpm --filter frontend test && pnpm --filter @virtual-office/tmj-optimize test",
-    "typecheck": "pnpm --filter shared typecheck && pnpm --filter backend typecheck && pnpm --filter frontend typecheck && pnpm --filter @virtual-office/tmj-optimize typecheck",
+    "test": "pnpm --filter backend test && pnpm --filter frontend test && pnpm --filter @virtual-office/tmj-optimize test && pnpm --filter @virtual-office/spritesheet test",
+    "typecheck": "pnpm --filter shared typecheck && pnpm --filter backend typecheck && pnpm --filter frontend typecheck && pnpm --filter @virtual-office/tmj-optimize typecheck && pnpm --filter @virtual-office/spritesheet typecheck",
     "lint": "eslint 'backend/src/**/*.ts' 'frontend/src/**/*.ts' 'packages/shared/src/**/*.ts' 'tools/*/src/**/*.ts'",
     "format": "prettier --write 'backend/src/**/*.ts' 'frontend/src/**/*.ts' 'packages/shared/src/**/*.ts' 'tools/*/src/**/*.ts'",
     "format:check": "prettier --check 'backend/src/**/*.ts' 'frontend/src/**/*.ts' 'packages/shared/src/**/*.ts' 'tools/*/src/**/*.ts'",
-    "tmj-optimize": "pnpm --filter @virtual-office/tmj-optimize exec tsx src/cli.ts"
+    "tmj-optimize": "pnpm --filter @virtual-office/tmj-optimize exec tsx src/cli.ts",
+    "spritesheet": "pnpm --filter @virtual-office/spritesheet exec tsx src/cli.ts"
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^8.59.1",
