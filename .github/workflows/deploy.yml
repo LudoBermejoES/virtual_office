@@ -16,6 +16,8 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Build shared package
+        run: pnpm --filter shared build
       - run: pnpm typecheck
       - run: pnpm lint
       - run: pnpm format:check
