@@ -6,6 +6,8 @@ import { placeAvatar, placeFallback } from "../render/avatar-mask.js";
 import type { AvatarVisual } from "../render/avatar-mask.js";
 import { placeSeatSprite, SEAT_ANIM_KEY, SEAT_SPRITE_KEY } from "../render/seat-sprite.js";
 import { renderNpcs } from "../render/npc-renderer.js";
+import { preloadTiledSprites, renderTiledSprites } from "../render/tiled-sprites.js";
+import { SPRITE_MANIFEST } from "../render/sprite-manifest.js";
 import { SpritePool } from "../render/sprite-pool.js";
 import { deskState } from "../domain/desk-state.js";
 import { connectOffice } from "../realtime/socket.js";
@@ -52,6 +54,7 @@ export class OfficeScene extends Phaser.Scene {
   private deskSeatSprites: Map<number, Phaser.GameObjects.Sprite> = new Map();
   private avatarStatus: Map<number, "loading" | "ready"> = new Map();
   private npcSprites: Phaser.GameObjects.Sprite[] = [];
+  private tiledSprites: Phaser.GameObjects.Sprite[] = [];
   private spritePool: SpritePool = new SpritePool();
   private poolTimer: Phaser.Time.TimerEvent | null = null;
   private tooltipEl: HTMLDivElement | null = null;
@@ -78,6 +81,13 @@ export class OfficeScene extends Phaser.Scene {
     for (const t of this.detail.tilesets) {
       this.load.image(`tiles:${o.id}:${t.ordinal}`, `${BASE_URL}/maps/${o.id}/${t.filename}`);
     }
+    // Cuando el TMJ esté parseado, recolectamos los sprites referenciados en
+    // object layers `sprites_*` y los añadimos al loader. Phaser permite
+    // añadir tasks durante el preload.
+    this.load.once("filecomplete-tilemapJSON-office", () => {
+      const tmj = (this.cache.tilemap.get("office") as { data?: unknown } | undefined)?.data;
+      if (tmj) preloadTiledSprites(this, tmj as never, SPRITE_MANIFEST);
+    });
   }
 
   create(): void {
@@ -105,6 +115,12 @@ export class OfficeScene extends Phaser.Scene {
       if (ts) tilesetObjs.push(ts);
     }
     for (const layer of map.layers) map.createLayer(layer.name, tilesetObjs);
+
+    // Sprites Aseprite anclados a object layers `sprites_*` del TMJ.
+    const tmjData = (this.cache.tilemap.get("office") as { data?: unknown } | undefined)?.data;
+    if (tmjData) {
+      this.tiledSprites = renderTiledSprites(this, tmjData as never, SPRITE_MANIFEST);
+    }
 
     this.fitCameraToMap(map);
 
@@ -155,6 +171,8 @@ export class OfficeScene extends Phaser.Scene {
       unsubscribeDate();
       this.wsHandle?.close();
       this.wsHandle = null;
+      for (const s of this.tiledSprites) s.destroy();
+      this.tiledSprites = [];
     });
   }
 
