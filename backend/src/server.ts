@@ -3,6 +3,7 @@ import { logger } from "./config/logger.js";
 import { initSentry } from "./infra/observability/sentry.js";
 import { openDb } from "./infra/db/sqlite.js";
 import { runMigrations } from "./infra/db/migrations.js";
+import { migrateTmjFilenames } from "./infra/storage/migrate-tmj-filenames.js";
 import { buildServer } from "./http/server.js";
 import { startBackupScheduler } from "./infra/backup/scheduler.js";
 import { GoogleVerifier } from "./infra/auth/google-verifier.js";
@@ -13,6 +14,11 @@ async function main(): Promise<void> {
   const db = openDb(env.DB_PATH);
   runMigrations(db);
   logger.info("Migraciones aplicadas");
+
+  const tmjMigrationResult = migrateTmjFilenames(db, env.OFFICE_MAPS_DIR);
+  if (tmjMigrationResult.migrated > 0 || tmjMigrationResult.missingFile > 0) {
+    logger.info("Migración filename TMJ aplicada", tmjMigrationResult);
+  }
 
   const googleVerifier = env.GOOGLE_CLIENT_ID
     ? new GoogleVerifier(env.GOOGLE_CLIENT_ID)

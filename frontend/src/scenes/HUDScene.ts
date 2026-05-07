@@ -10,6 +10,7 @@ import {
   mountAdminPanel,
   unmountAdminPanel,
   setEditDesksCallback,
+  setEditSpritesCallback,
   setPickDeskCallback,
 } from "../ui/admin-panel.js";
 import { mountDayPicker, unmountDayPicker, isDayPickerOpen } from "../ui/day-picker.js";
@@ -110,6 +111,25 @@ export class HUDScene extends Phaser.Scene {
           this.scene.start("AdminMapScene", {
             office: detail.office,
             desks: detail.desks,
+          });
+        })
+        .catch(() => {});
+    });
+
+    setEditSpritesCallback((officeId: number) => {
+      fetch(`${BASE_URL}/api/offices/${officeId}`, { credentials: "include" })
+        .then(async (res) => {
+          if (!res.ok) return;
+          const detail = (await res.json()) as OfficeDetail;
+          this.scene.stop("OfficeScene");
+          this.scene.stop("HUDScene");
+          this.scene.start("MapEditorScene", {
+            office: { id: detail.office.id, tilesets: detail.tilesets },
+            onClose: () => {
+              this.scene.stop("MapEditorScene");
+              this.scene.start("OfficeScene");
+              this.scene.launch("HUDScene");
+            },
           });
         })
         .catch(() => {});

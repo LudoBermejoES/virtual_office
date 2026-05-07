@@ -6,3 +6,4 @@ export * from "./date.js";
 export * from "./features.js";
 export * from "./npcs.js";
 export * from "./office.js";
+export * from "./sprite-manifest.js";

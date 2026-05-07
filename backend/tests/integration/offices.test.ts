@@ -146,7 +146,7 @@ describe("offices upload", () => {
     expect(data.office.tilesets[0]?.image_name).toBe("office_tiles.png");
 
     const files = readdirSync(join(mapsDir, String(data.office.id)));
-    expect(files.some((f) => /^map_[a-f0-9]{12}\.tmj$/.test(f))).toBe(true);
+    expect(files).toContain("map.tmj");
     expect(files.some((f) => /^tile_0_[a-f0-9]{12}\.png$/.test(f))).toBe(true);
   });
 

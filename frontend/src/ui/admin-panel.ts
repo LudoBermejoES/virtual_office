@@ -6,11 +6,16 @@ type Tab = (typeof TABS)[number];
 
 let panelEl: HTMLDivElement | null = null;
 let editDesksCallback: ((officeId: number) => void) | null = null;
+let editSpritesCallback: ((officeId: number) => void) | null = null;
 let pickDeskCallback: ((onPicked: (deskId: number, deskLabel: string) => void) => void) | null =
   null;
 
 export function setEditDesksCallback(cb: (officeId: number) => void): void {
   editDesksCallback = cb;
+}
+
+export function setEditSpritesCallback(cb: (officeId: number) => void): void {
+  editSpritesCallback = cb;
 }
 
 export function setPickDeskCallback(
@@ -358,6 +363,22 @@ function buildOfficeRow(office: { id: number; name: string }, onChanged: () => v
     editDesksCallback?.(office.id);
   });
 
+  const editSpritesBtn = document.createElement("button");
+  editSpritesBtn.textContent = "Editor de sprites";
+  Object.assign(editSpritesBtn.style, {
+    background: "transparent",
+    border: "1px solid #f5b400",
+    color: "#f5b400",
+    fontFamily: '"Press Start 2P", monospace',
+    fontSize: "8px",
+    padding: "4px 6px",
+    cursor: "pointer",
+  });
+  editSpritesBtn.addEventListener("click", () => {
+    unmountAdminPanel();
+    editSpritesCallback?.(office.id);
+  });
+
   const adminsBtn = document.createElement("button");
   adminsBtn.textContent = "Admins";
   Object.assign(adminsBtn.style, {
@@ -412,6 +433,7 @@ function buildOfficeRow(office: { id: number; name: string }, onChanged: () => v
   row.appendChild(nameEl);
   row.appendChild(updateMapBtn);
   row.appendChild(editBtn);
+  row.appendChild(editSpritesBtn);
   row.appendChild(adminsBtn);
   row.appendChild(delBtn);
 

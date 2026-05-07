@@ -22,15 +22,24 @@ export function sha256Hex(buf: Buffer): string {
   return createHash("sha256").update(buf).digest("hex");
 }
 
-export function computeTmjFilename(buf: Buffer): string {
-  return `map_${sha256Hex(buf).slice(0, 12)}.tmj`;
+/**
+ * Filename estable para el TMJ por oficina. Antes se derivaba del hash del
+ * contenido (`map_<hash12>.tmj`), pero el editor online del change 024 reescribe
+ * el TMJ in-place y necesita un path estable que no invalide URLs cacheadas.
+ *
+ * Una oficina = un fichero `map.tmj` dentro de `office-maps/<officeId>/`.
+ */
+export function computeTmjFilename(_buf: Buffer): string {
+  return "map.tmj";
 }
+
+export const STABLE_TMJ_FILENAME = "map.tmj";
 
 export function computeTilesetFilename(ordinal: number, sha: string, ext: "png" | "webp"): string {
   return `tile_${ordinal}_${sha.slice(0, 12)}.${ext}`;
 }
 
-const FILENAME_REGEX = /^(map|tile)_[a-zA-Z0-9_.-]+\.(tmj|png|webp)$/;
+const FILENAME_REGEX = /^(map\.tmj|map_[a-zA-Z0-9_.-]+\.tmj|tile_[a-zA-Z0-9_.-]+\.(png|webp))$/;
 
 export function isValidFilename(filename: string): boolean {
   return FILENAME_REGEX.test(filename);

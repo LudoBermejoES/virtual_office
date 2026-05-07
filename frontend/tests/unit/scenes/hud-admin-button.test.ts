@@ -55,6 +55,7 @@ vi.mock("../../../src/ui/admin-panel.js", () => ({
   mountAdminPanel: vi.fn(),
   unmountAdminPanel: vi.fn(),
   setEditDesksCallback: vi.fn(),
+  setEditSpritesCallback: vi.fn(),
   setPickDeskCallback: vi.fn(),
 }));
 

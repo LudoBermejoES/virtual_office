@@ -4,6 +4,7 @@ import { BootScene } from "./scenes/BootScene.js";
 import { LoginScene } from "./scenes/LoginScene.js";
 import { OfficeScene } from "./scenes/OfficeScene.js";
 import { AdminMapScene } from "./scenes/AdminMapScene.js";
+import { MapEditorScene } from "./scenes/MapEditorScene.js";
 import { HUDScene } from "./scenes/HUDScene.js";
 import { NoOfficeScene } from "./scenes/NoOfficeScene.js";
 
@@ -41,7 +42,15 @@ async function main(): Promise<void> {
     render: {
       antialias: false,
     },
-    scene: [BootScene, LoginScene, OfficeScene, AdminMapScene, HUDScene, NoOfficeScene],
+    scene: [
+      BootScene,
+      LoginScene,
+      OfficeScene,
+      AdminMapScene,
+      MapEditorScene,
+      HUDScene,
+      NoOfficeScene,
+    ],
   });
 }
 

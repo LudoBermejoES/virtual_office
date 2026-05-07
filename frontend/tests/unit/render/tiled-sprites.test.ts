@@ -186,9 +186,14 @@ describe("renderTiledSprites", () => {
       cache: {
         json: {
           get: vi.fn().mockReturnValue({ meta: { frameTags: [{ name: "fallback" }] } }),
+          has: vi.fn().mockReturnValue(true),
         },
       },
-      anims: { createFromAseprite: vi.fn(), exists: vi.fn().mockReturnValue(false) },
+      anims: {
+        createFromAseprite: vi.fn(),
+        exists: vi.fn().mockReturnValue(true),
+        get: vi.fn().mockReturnValue({ frames: [{ duration: 100 }] }),
+      },
       add: {
         sprite: vi.fn().mockImplementation((x: number, y: number, key: string) => {
           const s = {
@@ -199,9 +204,14 @@ describe("renderTiledSprites", () => {
               this.depth = d;
               return this;
             }),
-            play: vi.fn(({ key: animKey }: { key: string }) => {
+            play: vi.fn((cfg: string | { key: string }, _ignoreIfPlaying?: boolean) => {
+              const animKey = typeof cfg === "string" ? cfg : cfg.key;
               playCalls.push({ key: animKey });
             }),
+            anims: {
+              exists: vi.fn().mockReturnValue(true),
+              get: vi.fn().mockReturnValue({ frames: [{ duration: 100 }] }),
+            },
           };
           sprites.push(s as never);
           return s;

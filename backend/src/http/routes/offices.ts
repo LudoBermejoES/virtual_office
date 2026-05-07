@@ -1,6 +1,15 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import type { DatabaseSync } from "node:sqlite";
-import { createReadStream } from "node:fs";
+import { createReadStream, readFileSync, existsSync } from "node:fs";
+import { join } from "node:path";
+import { writeFileSync } from "node:fs";
+import { sha256Hex, STABLE_TMJ_FILENAME } from "../../infra/storage/office-maps.js";
+import {
+  PatchSpritesLayersSchema,
+  findUnknownSpriteId,
+  checkCoherence,
+  applyLayerEdits,
+} from "../../services/sprite-layers.js";
 import { z } from "zod";
 import { fileTypeFromBuffer } from "file-type";
 import { imageSize } from "image-size";
@@ -493,6 +502,115 @@ export async function officesRoutes(
 
       officesRepo.removeOfficeAdmin(db, params.data.id, params.data.userId);
       return reply.status(204).send();
+    },
+  );
+
+  app.get("/api/offices/:id/map/raw", { preHandler: app.requireAdmin }, async (request, reply) => {
+    const params = z.object({ id: z.coerce.number().int().positive() }).safeParse(request.params);
+    if (!params.success) return reply.status(400).send({ reason: "bad_request" });
+
+    const office = officesRepo.findOfficeById(db, params.data.id);
+    if (!office) return reply.status(404).send({ reason: "not_found" });
+
+    const dir = join(env.OFFICE_MAPS_DIR, String(office.id));
+    const tmjPath = join(dir, office.tmj_filename);
+    if (!existsSync(tmjPath)) {
+      return reply.status(404).send({ reason: "tmj_not_found" });
+    }
+
+    const buf = readFileSync(tmjPath);
+    let tmjJson: unknown;
+    try {
+      tmjJson = JSON.parse(buf.toString("utf-8"));
+    } catch {
+      return reply.status(500).send({ reason: "tmj_unreadable" });
+    }
+
+    return reply.status(200).send({
+      tmj: tmjJson,
+      tmj_hash: sha256Hex(buf),
+      tmj_filename: office.tmj_filename,
+    });
+  });
+
+  app.patch(
+    "/api/offices/:id/map/sprites-layers",
+    {
+      preHandler: app.requireAdmin,
+      config: { rateLimit: { max: 30, timeWindow: "1 minute" } },
+    },
+    async (request, reply) => {
+      const params = z.object({ id: z.coerce.number().int().positive() }).safeParse(request.params);
+      if (!params.success) return reply.status(400).send({ reason: "bad_request" });
+
+      const office = officesRepo.findOfficeById(db, params.data.id);
+      if (!office) return reply.status(404).send({ reason: "not_found" });
+
+      const bodyParsed = PatchSpritesLayersSchema.safeParse(request.body);
+      if (!bodyParsed.success) {
+        return reply.status(400).type("application/problem+json").send({
+          type: "about:blank",
+          title: "invalid_body",
+          errors: bodyParsed.error.issues,
+        });
+      }
+
+      const dir = join(env.OFFICE_MAPS_DIR, String(office.id));
+      const tmjPath = join(dir, office.tmj_filename);
+      if (!existsSync(tmjPath)) return reply.status(404).send({ reason: "tmj_not_found" });
+
+      const buf = readFileSync(tmjPath);
+      const currentHash = sha256Hex(buf);
+      if (currentHash !== bodyParsed.data.expected_hash) {
+        return reply.status(409).send({
+          error: "tmj_hash_mismatch",
+          current_hash: currentHash,
+        });
+      }
+
+      const unknownId = findUnknownSpriteId(bodyParsed.data.sprites_layers);
+      if (unknownId !== null) {
+        return reply.status(422).send({ error: "unknown_sprite_id", id: unknownId });
+      }
+
+      let tmjJson: unknown;
+      try {
+        tmjJson = JSON.parse(buf.toString("utf-8"));
+      } catch {
+        return reply.status(500).send({ reason: "tmj_unreadable" });
+      }
+
+      const coherence = checkCoherence(tmjJson as never, bodyParsed.data);
+      if (coherence !== null) {
+        const status =
+          coherence.kind === "layer_order_missing_system_layer"
+            ? 400
+            : coherence.kind === "layer_order_unknown_name"
+              ? 400
+              : coherence.kind === "layer_order_duplicate"
+                ? 400
+                : coherence.kind === "visibility_unknown_layer"
+                  ? 400
+                  : 400;
+        return reply.status(status).send({ error: coherence.kind, ...coherence });
+      }
+
+      const updated = applyLayerEdits(tmjJson as never, bodyParsed.data);
+      const serialized = JSON.stringify(updated, null, 2);
+      const newBuf = Buffer.from(serialized, "utf-8");
+      writeFileSync(tmjPath, newBuf);
+
+      // Aseguramos que la fila apunta al filename estable (por si la migración
+      // aún no había corrido; el handler es idempotente con el rename).
+      if (office.tmj_filename !== STABLE_TMJ_FILENAME) {
+        // No hay un repo helper para sólo este campo; hacemos UPDATE directo.
+        db.prepare("UPDATE offices SET tmj_filename = ? WHERE id = ?").run(
+          STABLE_TMJ_FILENAME,
+          office.id,
+        );
+      }
+
+      return reply.status(200).send({ tmj_hash: sha256Hex(newBuf) });
     },
   );
 

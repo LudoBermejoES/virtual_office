@@ -76,7 +76,7 @@ describe("saveBundle", () => {
       tmj: { buffer: tmjBuf, image_filenames: ["a.png"] },
       tilesets: [{ buffer: tilesetBuf, image_name: "a.png", mime_type: "image/png" }],
     });
-    expect(r.tmjFilename).toMatch(/^map_[a-f0-9]{12}\.tmj$/);
+    expect(r.tmjFilename).toBe("map.tmj");
     expect(r.tilesets).toHaveLength(1);
     expect(r.tilesets[0]?.filename).toMatch(/^tile_0_[a-f0-9]{12}\.png$/);
     expect(r.tilesets[0]?.image_name).toBe("a.png");
@@ -101,10 +101,32 @@ describe("saveBundle", () => {
     expect(first.tilesets[0]?.filename).toBe(second.tilesets[0]?.filename);
   });
 
-  it(computeTmjFilename.name + " hash es estable", () => {
-    expect(computeTmjFilename(Buffer.from("abc"))).toBe(computeTmjFilename(Buffer.from("abc")));
-    expect(computeTmjFilename(Buffer.from("abc"))).not.toBe(
-      computeTmjFilename(Buffer.from("abcd")),
-    );
+  it(computeTmjFilename.name + " devuelve siempre 'map.tmj' (filename estable)", () => {
+    expect(computeTmjFilename(Buffer.from("abc"))).toBe("map.tmj");
+    expect(computeTmjFilename(Buffer.from("abcd"))).toBe("map.tmj");
+    expect(computeTmjFilename(Buffer.from(""))).toBe("map.tmj");
+  });
+});
+
+describe("serveSafe acepta map.tmj estable", () => {
+  let baseDir: string;
+  beforeEach(() => {
+    baseDir = mkdtempSync(join(tmpdir(), "vo-maps-stable-"));
+    mkdirSync(join(baseDir, "1"), { recursive: true });
+    writeFileSync(join(baseDir, "1", "map.tmj"), "{}");
+  });
+  afterEach(() => {
+    rmSync(baseDir, { recursive: true, force: true });
+  });
+
+  it("acepta el nombre estable map.tmj", () => {
+    const r = serveSafe(baseDir, 1, "map.tmj");
+    expect(r.ok).toBe(true);
+  });
+
+  it("acepta filenames legacy map_<hash>.tmj para compat durante migración", () => {
+    writeFileSync(join(baseDir, "1", "map_abc123.tmj"), "{}");
+    const r = serveSafe(baseDir, 1, "map_abc123.tmj");
+    expect(r.ok).toBe(true);
   });
 });

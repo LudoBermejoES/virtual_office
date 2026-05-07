@@ -180,19 +180,40 @@ export function renderTiledSprites(
       console.warn(`[tiled-sprites] textura "${p.id}" no cargada; ignorando placement`);
       continue;
     }
-    // createFromAseprite es idempotente (ignora keys ya existentes).
-    scene.anims.createFromAseprite(p.id);
-
     const sprite = scene.add.sprite(p.x, p.y, p.id);
     sprite.setDepth(p.depth);
 
-    const tag = p.tag ?? manifest[p.id]?.defaultTag;
-    if (tag) {
-      sprite.play({ key: tag, repeat: -1 });
+    // Registramos las anims Aseprite COMO PROPIAS del sprite (target = sprite)
+    // en lugar de globales. Si dos sprites del manifest comparten el mismo tag
+    // (ej. varios con `idle`), las anims globales colisionan: la segunda no se
+    // registra y al hacer `play("idle")` el engine reproduce los frames del
+    // primero, generando el bug "el sprite muestra la animación de otro".
+    const hasAsepriteJson = scene.cache.json.has(p.id);
+    if (hasAsepriteJson) {
+      scene.anims.createFromAseprite(p.id, undefined, sprite);
+      const tag = p.tag ?? manifest[p.id]?.defaultTag;
+      const resolvedTag = tag ?? readFirstAsepriteTag(scene, p.id);
+      if (resolvedTag && sprite.anims.exists(resolvedTag)) {
+        const anim = sprite.anims.get(resolvedTag);
+        const firstFrameDuration = (anim as unknown as { frames?: Array<{ duration?: number }> })
+          .frames?.[0]?.duration;
+        if (typeof firstFrameDuration !== "number") {
+          console.warn(
+            `[tiled-sprites] anim "${resolvedTag}" para "${p.id}" registrada pero sin frames válidos; salto play`,
+          );
+        } else {
+          try {
+            sprite.play({ key: resolvedTag, repeat: -1 }, true);
+          } catch (err) {
+            console.warn(
+              `[tiled-sprites] no se pudo reproducir tag "${resolvedTag}" en "${p.id}":`,
+              err,
+            );
+          }
+        }
+      }
     } else {
-      // Sin tag: leer el primer frameTag del JSON Aseprite cacheado por scene.load.aseprite.
-      const firstTag = readFirstAsepriteTag(scene, p.id);
-      if (firstTag) sprite.play({ key: firstTag, repeat: -1 });
+      console.warn(`[tiled-sprites] JSON Aseprite "${p.id}" aún no en cache; sprite sin animación`);
     }
 
     created.push(sprite);

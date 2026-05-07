@@ -117,9 +117,20 @@ export class OfficeScene extends Phaser.Scene {
     for (const layer of map.layers) map.createLayer(layer.name, tilesetObjs);
 
     // Sprites Aseprite anclados a object layers `sprites_*` del TMJ.
+    // Los aseprites se encolan en el callback `filecomplete-tilemapJSON-office`
+    // del preload, pero su descarga puede no haber terminado todavía cuando
+    // llegamos aquí. Renderizamos lo que esté disponible y, si el loader sigue
+    // activo, repetimos al COMPLETE para recoger los que llegaron tarde.
     const tmjData = (this.cache.tilemap.get("office") as { data?: unknown } | undefined)?.data;
     if (tmjData) {
-      this.tiledSprites = renderTiledSprites(this, tmjData as never, SPRITE_MANIFEST);
+      const renderSprites = (): void => {
+        for (const s of this.tiledSprites) s.destroy();
+        this.tiledSprites = renderTiledSprites(this, tmjData as never, SPRITE_MANIFEST);
+      };
+      renderSprites();
+      if (this.load.isLoading()) {
+        this.load.once(Phaser.Loader.Events.COMPLETE, () => renderSprites());
+      }
     }
 
     this.fitCameraToMap(map);
