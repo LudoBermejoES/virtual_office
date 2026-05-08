@@ -11,6 +11,21 @@ export interface UserRow {
   role: UserRole;
   is_invited_external: number;
   created_at: string;
+  /** Cuando es 1, el upsert de Google login NO machaca `avatar_url` (change 030). */
+  avatar_locked: number;
+}
+
+export function setAvatarLocked(
+  db: DatabaseSync,
+  userId: number,
+  avatarUrl: string | null,
+  locked: 0 | 1,
+): void {
+  db.prepare("UPDATE users SET avatar_url = ?, avatar_locked = ? WHERE id = ?").run(
+    avatarUrl,
+    locked,
+    userId,
+  );
 }
 
 export function upsertUser(
@@ -25,13 +40,16 @@ export function upsertUser(
     is_invited_external?: number;
   },
 ): UserRow {
+  // `avatar_url` solo se actualiza si `users.avatar_locked = 0`. Cuando un
+  // admin sube un avatar custom (change 030) ponemos `avatar_locked = 1` para
+  // que el siguiente login de Google no machaque la URL `/avatars/...`.
   db.prepare(
     `INSERT INTO users (google_sub, email, domain, name, avatar_url, role, is_invited_external)
      VALUES (?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(google_sub) DO UPDATE SET
        email = excluded.email,
        name = excluded.name,
-       avatar_url = excluded.avatar_url`,
+       avatar_url = CASE WHEN users.avatar_locked = 1 THEN users.avatar_url ELSE excluded.avatar_url END`,
   ).run(
     data.google_sub,
     data.email,

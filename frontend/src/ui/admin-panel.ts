@@ -1,6 +1,7 @@
 import { BASE_URL } from "../config.js";
 import { officesStore } from "../state/offices.js";
 import { renderRecurrenciasTab } from "./admin-recurrencias-tab.js";
+import { mountAdminAvatarModal } from "./admin-avatar-modal.js";
 
 const TABS = ["OFICINAS", "USUARIOS", "FIJOS", "RECURRENCIAS"] as const;
 type Tab = (typeof TABS)[number];
@@ -582,7 +583,14 @@ function renderUsuarios(container: HTMLElement): void {
   ])
     .then(
       ([users, invitations]: [
-        { id: number; name: string; email: string; role: string }[],
+        {
+          id: number;
+          name: string;
+          email: string;
+          role: string;
+          avatar_url: string | null;
+          avatar_locked: number;
+        }[],
         {
           id: number;
           email: string;
@@ -622,7 +630,14 @@ function renderUsuarios(container: HTMLElement): void {
 }
 
 function buildUserRow(
-  user: { id: number; name: string; email: string; role: string },
+  user: {
+    id: number;
+    name: string;
+    email: string;
+    role: string;
+    avatar_url: string | null;
+    avatar_locked: number;
+  },
   onChanged: () => void,
 ): HTMLElement {
   const row = document.createElement("div");
@@ -639,6 +654,34 @@ function buildUserRow(
   info.textContent = `${user.name} (${user.email}) — ${user.role}`;
   info.style.flex = "1";
   row.appendChild(info);
+
+  const avatarBtn = document.createElement("button");
+  avatarBtn.textContent = "Avatar";
+  avatarBtn.dataset["role"] = "open-avatar-modal";
+  Object.assign(avatarBtn.style, {
+    background: "transparent",
+    border: "1px solid #b66dff",
+    color: "#b66dff",
+    fontFamily: '"Press Start 2P", monospace',
+    fontSize: "8px",
+    padding: "4px 6px",
+    cursor: "pointer",
+  });
+  avatarBtn.addEventListener("click", () => {
+    mountAdminAvatarModal({
+      doc: document,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        avatar_url: user.avatar_url,
+        avatar_locked: user.avatar_locked,
+      },
+      baseUrl: BASE_URL,
+      onChanged,
+    });
+  });
+  row.appendChild(avatarBtn);
 
   const isAdmin = user.role === "admin";
   const toggleBtn = document.createElement("button");

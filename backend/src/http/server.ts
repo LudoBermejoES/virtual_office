@@ -20,6 +20,7 @@ import { bookingsRoutes } from "./routes/bookings.js";
 import { fixedAssignmentsRoutes } from "./routes/fixed-assignments.js";
 import { weeklyRoutes } from "./routes/weekly.js";
 import { usersRoutes } from "./routes/users.js";
+import { avatarsRoutes } from "./routes/avatars.js";
 import { occupancyWsRoutes } from "./ws/occupancy.js";
 import { testAuthRoutes } from "./routes/test-auth.js";
 import { WsHub } from "../infra/ws/hub.js";
@@ -62,6 +63,7 @@ export async function buildServer({ db, googleVerifier, env, hub: hubOverride }:
   await app.register(fixedAssignmentsRoutes, { db, env, hub });
   await app.register(weeklyRoutes, { db, env });
   await app.register(usersRoutes, { db, env });
+  await app.register(avatarsRoutes, { db, env });
   await app.register(occupancyWsRoutes, { db, env, hub });
 
   if (env.TEST_AUTH === "on") {
@@ -90,7 +92,8 @@ export async function buildServer({ db, googleVerifier, env, hub: hubOverride }:
         if (
           request.url.startsWith("/api/") ||
           request.url.startsWith("/ws") ||
-          request.url.startsWith("/maps/")
+          request.url.startsWith("/maps/") ||
+          request.url.startsWith("/avatars/")
         ) {
           return reply.status(404).send({ reason: "not_found" });
         }

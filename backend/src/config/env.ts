@@ -38,6 +38,9 @@ const envSchema = z.object({
   MAX_TILESET_BYTES: z.coerce.number().int().positive().default(2_097_152),
   MAX_MAP_TOTAL_BYTES: z.coerce.number().int().positive().default(10_485_760),
 
+  AVATARS_DIR: z.string().default("./data/avatars"),
+  MAX_AVATAR_BYTES: z.coerce.number().int().positive().default(1_048_576),
+
   FRONTEND_DIST_DIR: z.string().optional().default(""),
 });
 

@@ -16,6 +16,7 @@ export default defineConfig({
       "/api": "http://localhost:8080",
       "/healthz": "http://localhost:8080",
       "/maps": "http://localhost:8080",
+      "/avatars": "http://localhost:8080",
     },
   },
 });
