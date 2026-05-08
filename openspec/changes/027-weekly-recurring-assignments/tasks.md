@@ -1,40 +1,37 @@
 # Tasks
 
-> NOTA: este change está en propuesta. Las tareas concretas se cerrarán al
-> redactar `design.md`. Esta lista es un esqueleto para mostrar el alcance
-> general y permitir que `openspec validate` pase.
+## 1. Modelo de datos compartido (dow helper)
 
-## 1. Modelo de datos
+- [x] 1.1 Helper `dowOfDate(isoDate: string): number` en `packages/shared/src/dow.ts` (0=lunes ... 6=domingo). 6 tests unit verde. Etiquetas `DOW_LABELS_ES` y `DOW_LABELS_LONG_ES` también exportadas.
 
-- [ ] 1.1 Migración SQL `0NNN_weekly_assignments.sql`: tabla `weekly_assignments(id, desk_id, user_id, dow, created_at, created_by)`, UNIQUE `(desk_id, dow)`, FKs.
-- [ ] 1.2 Migración SQL `0NNN_weekly_exceptions.sql` (o decidir reutilizar `fixed_exceptions` generalizado).
-- [ ] 1.3 Repos `weekly-assignments.ts` y `weekly-exceptions.ts` con tests unit.
+## 2. Migración SQL
 
-## 2. Endpoints CRUD weekly
+- [x] 2.1 Migración `0008_weekly_assignments.sql` con tabla `weekly_assignments` (UNIQUE (desk_id, dow) + UNIQUE (user_id, dow) + CHECK dow), tabla `weekly_assignment_exceptions` con CASCADE, e índices.
+- [x] 2.2 Test integración (4 tests passing) verifica esquema, CHECK, índices.
 
-- [ ] 2.1 `POST /api/desks/:id/weekly` con guarda admin, validación `dow ∈ [0..6]`, conflictos. Tests integración.
-- [ ] 2.2 `DELETE /api/desks/:id/weekly/:weeklyId`. Tests integración.
-- [ ] 2.3 `GET /api/offices/:id/weekly` (listado por oficina). Tests integración.
+## 3. Repo `weekly-assignments`
 
-## 3. Cómputo de bookings de un día
+- [x] 3.1–3.8 Repo `weekly-assignments` con `createWeekly`, `deleteWeeklyById`, `findByDeskAndDow`, `listByOffice`, `findActiveForDeskDate`, `findActiveForUserDate`, `listActiveForOfficeDate`, `createException`. Excepción `WeeklyAssignmentConflict` con columna `desk_dow|user_dow`. **9 tests** unit verde.
 
-- [ ] 3.1 Adaptar el servicio que arma `bookings[]` para una fecha: añadir weeklies proyectadas según `dow` con `type: "weekly"`.
-- [ ] 3.2 Reglas de precedencia: fixed > weekly > daily, exceptions invalidan el slot.
-- [ ] 3.3 Tests integración cubriendo los casos de overlap y precedencia.
+## 4. Cómputo de bookings de un día (refactor)
 
-## 4. UI usuario (excepción weekly)
+- [x] 4.1–4.5 Cómputo del detalle de oficina extendido: weeklies del dow se proyectan en `bookings[]` con `type: "weekly"` cuando no hay daily ni fixed sobre el desk y el usuario no tiene otra reserva ese día. **7 tests** integración verde (proyección, dow distinto, excepción suprime, daily prevalece, otro desk no interfiere, dos weeklies coexisten, fixed gana ante inconsistencia).
 
-- [ ] 4.1 Botón en HUD para "saltarse este día" cuando el booking visible es de tipo weekly.
-- [ ] 4.2 Endpoint `POST /api/desks/:id/weekly/:weeklyId/exceptions { date }`.
+## 5. Endpoints CRUD weekly
 
-## 5. UI admin (en modal del change 026)
+- [x] 5.1–5.9 Endpoints `POST/DELETE/GET` en nuevo `backend/src/http/routes/weekly.ts`, registrados en `server.ts`. **12 tests** integración verde (admin/no-admin, dow fuera de rango, userId inexistente, desk con fixed, conflictos desk_dow y user_dow, DELETE 204, GET listado enriquecido).
 
-- [ ] 5.1 Checkbox "todos los <día>" al lado del nombre de cada usuario en el modal admin.
-- [ ] 5.2 Si el usuario ya tiene weekly para ese (desk, dow), el checkbox aparece marcado; desmarcarlo borra.
-- [ ] 5.3 Listado weekly en admin panel con borrar inline.
+## 6. UI: extensión del modal admin (change 026)
 
-## 6. Validación final
+- [ ] 6.1 Test unit: modal en modo `book` con prop `weeklyByUserId` muestra 7 checkboxes (L M X J V S D) por usuario.
+- [ ] 6.2 Test unit: cambiar checkboxes acumula deltas (creates/deletes) y se aplican al pulsar "Guardar".
+- [ ] 6.3 Test unit: si el usuario ya tiene weekly conflictivo (otro desk mismo dow), el checkbox de ese dow está disabled con tooltip explicativo.
+- [ ] 6.4 Adaptar `frontend/src/ui/admin-book-modal.ts` añadiendo la prop `weeklyByUserId: Record<userId, dow[]>` y la columna de checkboxes.
+- [ ] 6.5 En `OfficeScene.openAdminBookModal`, antes de montar el modal: cargar `GET /api/offices/:id/weekly` y filtrar por `desk_id = current` para precargar el estado de checkboxes.
+- [ ] 6.6 Al pulsar "Guardar": ejecutar deltas (POST/DELETE weeklies) en serie, mostrar feedback en HUD si alguna falla.
 
-- [ ] 6.1 `openspec validate --all --strict` en verde.
-- [ ] 6.2 Typecheck + lint + format.
-- [ ] 6.3 Tests unit + integración.
+## 7. Validación final
+
+- [ ] 7.1 `openspec validate --all --strict` en verde.
+- [ ] 7.2 `pnpm typecheck && pnpm lint && pnpm format:check` en verde.
+- [ ] 7.3 `pnpm test` en verde (backend + frontend + tools).

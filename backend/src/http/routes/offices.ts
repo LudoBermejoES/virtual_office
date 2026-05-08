@@ -20,6 +20,8 @@ import * as desksRepo from "../../infra/repos/desks.js";
 import * as bookingsRepo from "../../infra/repos/bookings.js";
 import * as fixedRepo from "../../infra/repos/fixed-assignments.js";
 import * as exceptionsRepo from "../../infra/repos/fixed-exceptions.js";
+import * as weeklyRepo from "../../infra/repos/weekly-assignments.js";
+import { dowOfDate } from "@virtual-office/shared";
 import * as featuresRepo from "../../infra/repos/features.js";
 import * as npcsRepo from "../../infra/repos/npcs.js";
 import { officeRoom } from "../../infra/ws/hub.js";
@@ -376,7 +378,7 @@ export async function officesRoutes(
       id: number;
       deskId: number;
       userId: number;
-      type: "daily" | "fixed";
+      type: "daily" | "fixed" | "weekly";
       date: string;
       user: { id: number; name: string; avatar_url: string | null };
     }> = [];
@@ -394,6 +396,8 @@ export async function officesRoutes(
         user: { id: b.user_id, name: b.userName, avatar_url: b.userAvatarUrl },
       });
     }
+    // Set de desks ya cubiertos por daily o fixed (para que weekly no pise).
+    const fixedByDeskId = new Map<number, (typeof fixedRows)[number]>();
     for (const f of fixedRows) {
       if (skippedFixedIds.has(f.id)) continue;
       if (dailyByDeskId.has(f.desk_id)) continue;
@@ -406,6 +410,36 @@ export async function officesRoutes(
         date,
         user: { id: f.user_id, name: f.userName, avatar_url: f.userAvatarUrl },
       });
+      fixedByDeskId.set(f.desk_id, f);
+    }
+
+    // Weeklies del día: precedencia DAILY > FIXED > WEEKLY. Solo proyectamos
+    // si el desk no está cubierto por daily ni fixed Y el usuario tampoco
+    // (un usuario con daily o fixed ese día no aparece dos veces).
+    const dow = dowOfDate(date);
+    const weeklyRows = weeklyRepo.listActiveForOfficeDate(db, officeId, date, dow);
+    if (weeklyRows.length > 0) {
+      const userIdsTaken = new Set<number>();
+      for (const b of bookings) userIdsTaken.add(b.userId);
+      for (const w of weeklyRows) {
+        if (dailyByDeskId.has(w.desk_id)) continue;
+        if (fixedByDeskId.has(w.desk_id)) continue;
+        if (userIdsTaken.has(w.user_id)) continue;
+        // Hidratamos el user para el payload.
+        const user = db
+          .prepare("SELECT id, name, avatar_url FROM users WHERE id = ?")
+          .get(w.user_id) as { id: number; name: string; avatar_url: string | null } | undefined;
+        if (!user) continue;
+        bookings.push({
+          id: -1000000 - w.id,
+          deskId: w.desk_id,
+          userId: w.user_id,
+          type: "weekly",
+          date,
+          user: { id: user.id, name: user.name, avatar_url: user.avatar_url },
+        });
+        userIdsTaken.add(w.user_id);
+      }
     }
 
     const myException = exceptionsRepo.findUserExceptionForDate(
