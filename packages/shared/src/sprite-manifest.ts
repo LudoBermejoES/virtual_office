@@ -35,4 +35,9 @@ export const SPRITE_MANIFEST: SpriteManifest = {
     json: "/sprites/security_camera_1/animated_security_camera_left_48x48.json",
     defaultTag: "left",
   },
+  red_balloon: {
+    png: "/sprites/red_balloon/animated_party_balloon_red_48x48.png",
+    json: "/sprites/red_balloon/animated_party_balloon_red_48x48.json",
+    defaultTag: "idle",
+  },
 };
