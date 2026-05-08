@@ -381,6 +381,9 @@ export async function officesRoutes(
       type: "daily" | "fixed" | "weekly";
       date: string;
       user: { id: number; name: string; avatar_url: string | null };
+      /** Solo para weekly: id de la weekly_assignment subyacente y su dow. */
+      weeklyId?: number;
+      dow?: number;
     }> = [];
 
     const dailyByUserId = new Map<number, (typeof rows)[number]>();
@@ -437,6 +440,8 @@ export async function officesRoutes(
           type: "weekly",
           date,
           user: { id: user.id, name: user.name, avatar_url: user.avatar_url },
+          weeklyId: w.id,
+          dow: w.dow,
         });
         userIdsTaken.add(w.user_id);
       }

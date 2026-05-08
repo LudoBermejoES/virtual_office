@@ -17,6 +17,7 @@ import * as desksRepo from "../../infra/repos/desks.js";
 import * as officesRepo from "../../infra/repos/offices.js";
 import { findUserById } from "../../infra/repos/users.js";
 import { canAdminOffice } from "../../services/auth.service.js";
+import { dowOfDate } from "@virtual-office/shared";
 import type { Env } from "../../config/env.js";
 
 export async function weeklyRoutes(
@@ -120,4 +121,121 @@ export async function weeklyRoutes(
 
     return reply.status(200).send(weeklyRepo.listByOffice(db, office.id));
   });
+
+  // ------- Excepciones de weekly (change 028) -------
+  // POST: crea una excepción de la weekly para una fecha concreta. Pueden
+  // actuar el dueño de la weekly o un admin de la oficina. La fecha debe
+  // ser un día de la semana cuyo dow coincida con `weekly.dow`.
+  app.post(
+    "/api/desks/:id/weekly/:weeklyId/exceptions",
+    { preHandler: app.requireAuth },
+    async (request, reply) => {
+      const params = z
+        .object({
+          id: z.coerce.number().int().positive(),
+          weeklyId: z.coerce.number().int().positive(),
+        })
+        .safeParse(request.params);
+      if (!params.success) return reply.status(400).send({ reason: "bad_request" });
+
+      const body = z.object({ date: z.string() }).safeParse(request.body);
+      if (!body.success) return reply.status(400).send({ reason: "bad_request" });
+
+      const desk = desksRepo.findDeskById(db, params.data.id);
+      if (!desk) return reply.status(404).send({ reason: "desk_not_found" });
+
+      const weekly = weeklyRepo.findWeeklyById(db, params.data.weeklyId);
+      if (!weekly || weekly.desk_id !== desk.id) {
+        return reply.status(404).send({ reason: "weekly_not_found" });
+      }
+
+      const me = request.user!;
+      const isOwner = weekly.user_id === me.id;
+      const isAdmin = canAdminOffice(me, desk.office_id, db);
+      if (!isOwner && !isAdmin) {
+        return reply.status(403).send({ reason: "not_authorized" });
+      }
+
+      // Validar fecha y dow.
+      const isoMatch = /^\d{4}-\d{2}-\d{2}$/.test(body.data.date);
+      if (!isoMatch) return reply.status(422).send({ reason: "invalid_date" });
+      const dateDow = dowOfDate(body.data.date);
+      if (dateDow !== weekly.dow) {
+        return reply.status(422).send({ reason: "date_dow_mismatch" });
+      }
+
+      const inserted = weeklyRepo.createExceptionStrict(db, weekly.id, body.data.date);
+      if (!inserted) {
+        return reply.status(409).send({ reason: "exception_already_exists" });
+      }
+
+      if (!isOwner && isAdmin) {
+        logger.info("weekly.exception.created.byAdmin", {
+          weeklyId: weekly.id,
+          deskId: desk.id,
+          adminId: me.id,
+          targetUserId: weekly.user_id,
+          date: body.data.date,
+        });
+      } else {
+        logger.info("weekly.exception.created", {
+          weeklyId: weekly.id,
+          deskId: desk.id,
+          userId: me.id,
+          date: body.data.date,
+        });
+      }
+
+      return reply.status(201).send({
+        exception: { weekly_assignment_id: weekly.id, date: body.data.date },
+      });
+    },
+  );
+
+  app.delete(
+    "/api/desks/:id/weekly/:weeklyId/exceptions",
+    { preHandler: app.requireAuth },
+    async (request, reply) => {
+      const params = z
+        .object({
+          id: z.coerce.number().int().positive(),
+          weeklyId: z.coerce.number().int().positive(),
+        })
+        .safeParse(request.params);
+      if (!params.success) return reply.status(400).send({ reason: "bad_request" });
+
+      const body = z.object({ date: z.string() }).safeParse(request.body);
+      if (!body.success) return reply.status(400).send({ reason: "bad_request" });
+
+      const desk = desksRepo.findDeskById(db, params.data.id);
+      if (!desk) return reply.status(404).send({ reason: "desk_not_found" });
+
+      const weekly = weeklyRepo.findWeeklyById(db, params.data.weeklyId);
+      if (!weekly || weekly.desk_id !== desk.id) {
+        return reply.status(404).send({ reason: "weekly_not_found" });
+      }
+
+      const me = request.user!;
+      const isOwner = weekly.user_id === me.id;
+      const isAdmin = canAdminOffice(me, desk.office_id, db);
+      if (!isOwner && !isAdmin) {
+        return reply.status(403).send({ reason: "not_authorized" });
+      }
+
+      const removed = weeklyRepo.deleteException(db, weekly.id, body.data.date);
+      if (!removed) {
+        return reply.status(404).send({ reason: "exception_not_found" });
+      }
+
+      logger.info(isOwner ? "weekly.exception.deleted" : "weekly.exception.deleted.byAdmin", {
+        weeklyId: weekly.id,
+        deskId: desk.id,
+        userId: weekly.user_id,
+        date: body.data.date,
+        deletedBy: me.id,
+      });
+
+      return reply.status(204).send();
+    },
+  );
 }

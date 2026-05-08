@@ -194,3 +194,49 @@ export function createException(
     `INSERT OR IGNORE INTO weekly_assignment_exceptions (weekly_assignment_id, date) VALUES (?, ?)`,
   ).run(weeklyAssignmentId, isoDate);
 }
+
+/**
+ * Crea una excepción y devuelve `true` si se insertó, `false` si ya existía
+ * (UNIQUE constraint). Útil para que el handler diferencie 201 de 409.
+ */
+export function createExceptionStrict(
+  db: DatabaseSync,
+  weeklyAssignmentId: number,
+  isoDate: string,
+): boolean {
+  const r = db
+    .prepare(
+      `INSERT OR IGNORE INTO weekly_assignment_exceptions (weekly_assignment_id, date) VALUES (?, ?)`,
+    )
+    .run(weeklyAssignmentId, isoDate);
+  return r.changes > 0;
+}
+
+export function deleteException(
+  db: DatabaseSync,
+  weeklyAssignmentId: number,
+  isoDate: string,
+): boolean {
+  const r = db
+    .prepare(`DELETE FROM weekly_assignment_exceptions WHERE weekly_assignment_id = ? AND date = ?`)
+    .run(weeklyAssignmentId, isoDate);
+  return r.changes > 0;
+}
+
+export interface WeeklyAssignmentException {
+  id: number;
+  weekly_assignment_id: number;
+  date: string;
+  created_at: string;
+}
+
+export function listExceptions(
+  db: DatabaseSync,
+  weeklyAssignmentId: number,
+): WeeklyAssignmentException[] {
+  return db
+    .prepare(
+      `SELECT * FROM weekly_assignment_exceptions WHERE weekly_assignment_id = ? ORDER BY date`,
+    )
+    .all(weeklyAssignmentId) as unknown as WeeklyAssignmentException[];
+}

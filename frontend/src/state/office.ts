@@ -15,9 +15,18 @@ export interface BookingDto {
   id: number;
   deskId: number;
   userId: number;
-  type: "daily" | "fixed";
+  /** "weekly" se proyecta desde `weekly_assignments` (change 027). */
+  type: "daily" | "fixed" | "weekly";
   date: string;
   user: { id: number; name: string; avatar_url: string | null };
+  /**
+   * Solo para `type: "weekly"`: id de la weekly_assignment subyacente, para
+   * poder llamar a los endpoints `/weekly/:weeklyId/exceptions` y
+   * `/weekly/:weeklyId` desde la UI.
+   */
+  weeklyId?: number;
+  /** Solo para `type: "weekly"`: dow [0..6] de la asignación semanal. */
+  dow?: number;
 }
 
 export interface OfficeDetail {

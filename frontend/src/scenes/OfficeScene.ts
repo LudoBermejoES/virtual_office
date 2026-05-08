@@ -15,6 +15,8 @@ import { uiStore, shouldApply } from "../state/ui.js";
 import { officesStore } from "../state/offices.js";
 import { mountAdminBookModal, unmountAdminBookModal } from "../ui/admin-book-modal.js";
 import type { AdminBookModalUser } from "../ui/admin-book-modal.js";
+import { mountWeeklyActionModal, unmountWeeklyActionModal } from "../ui/weekly-action-modal.js";
+import { DOW_LABELS_LONG_ES } from "@virtual-office/shared";
 import type { ConnectHandle } from "../realtime/socket.js";
 import type { WsServerMessage } from "@virtual-office/shared";
 import type { Desk, OfficeDetail } from "../state/office.js";
@@ -485,6 +487,21 @@ export class OfficeScene extends Phaser.Scene {
     }
     const isAdmin = officesStore.getState().meRole === "admin";
 
+    // Branch weekly (change 028): si la reserva proyectada es weekly,
+    // gestionarla con el modal dedicado en lugar del flujo normal de
+    // bookings. Sin esto, admin clicks daban 404 (intentaba DELETE
+    // /bookings que no existe para weeklies proyectadas).
+    const bookingHere = this.detail.bookings.find((x) => x.deskId === desk.id);
+    if (bookingHere?.type === "weekly") {
+      const isMine = bookingHere.userId === this.meId;
+      if (!isAdmin && !isMine) {
+        this.showFeedback(`Ocupado por ${bookingHere.user.name}`);
+        return;
+      }
+      await this.openWeeklyActionModal(desk, bookingHere);
+      return;
+    }
+
     // Admin: en lugar de la acción directa, abrir el modal del change 026 que
     // permite reservar/liberar a nombre de cualquier usuario.
     if (isAdmin) {
@@ -640,6 +657,81 @@ export class OfficeScene extends Phaser.Scene {
         unmountAdminBookModal();
       },
     });
+  }
+
+  /**
+   * Modal del change 028: el caller pulsó un puesto cuya reserva visible es
+   * de tipo weekly. Distingue tres modos:
+   *  - user dueño de la weekly y SIN excepción para hoy → "Saltarme hoy"
+   *  - user dueño con excepción ya activa → "Recuperar mi puesto"
+   *  - admin sobre weekly de cualquiera → "Saltar este día" + "Quitar todos los X"
+   */
+  private async openWeeklyActionModal(
+    desk: Desk,
+    booking: { userId: number; user: { name: string }; weeklyId?: number; dow?: number },
+  ): Promise<void> {
+    if (!this.detail) return;
+    const weeklyId = booking.weeklyId;
+    const dow = booking.dow;
+    if (weeklyId === undefined || dow === undefined) {
+      this.showFeedback("Datos de weekly incompletos");
+      return;
+    }
+    const dateIso = this.detail.date;
+    const dateLabel = formatDateEs(dateIso);
+    const dowLabel = DOW_LABELS_LONG_ES[dow]?.toLowerCase() ?? "este día";
+
+    const isAdmin = officesStore.getState().meRole === "admin";
+    const isMine = booking.userId === this.meId;
+
+    if (isMine && !isAdmin) {
+      mountWeeklyActionModal({
+        deskLabel: desk.label,
+        dateLabel,
+        dowLabel,
+        mode: { kind: "user_self" },
+        onSkipDay: async () => {
+          await this.skipWeeklyDay(desk, weeklyId, dateIso);
+          unmountWeeklyActionModal();
+        },
+        onClose: () => unmountWeeklyActionModal(),
+      });
+      return;
+    }
+
+    if (isAdmin) {
+      mountWeeklyActionModal({
+        deskLabel: desk.label,
+        dateLabel,
+        dowLabel,
+        mode: { kind: "admin", targetUserName: booking.user.name },
+        onSkipDay: async () => {
+          await this.skipWeeklyDay(desk, weeklyId, dateIso);
+          unmountWeeklyActionModal();
+        },
+        onDeleteWeekly: async () => {
+          await this.deleteWeekly(desk.id, weeklyId);
+          await this.refreshSnapshot();
+          unmountWeeklyActionModal();
+        },
+        onClose: () => unmountWeeklyActionModal(),
+      });
+    }
+  }
+
+  private async skipWeeklyDay(desk: Desk, weeklyId: number, date: string): Promise<void> {
+    const res = await fetch(`${BASE_URL}/api/desks/${desk.id}/weekly/${weeklyId}/exceptions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ date }),
+    });
+    if (res.ok) {
+      await this.refreshSnapshot();
+      return;
+    }
+    const err = (await res.json().catch(() => ({}))) as { reason?: string };
+    this.showFeedback(`Error: ${err.reason ?? String(res.status)}`);
   }
 
   private async createWeekly(deskId: number, userId: number, dow: number): Promise<boolean> {
