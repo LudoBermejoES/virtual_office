@@ -147,7 +147,7 @@ jobs:
             sudo tar -xzf /tmp/vo.tar.gz -C "$DEPLOY_PATH"
 
             # Ensure persistent dirs exist
-            sudo mkdir -p "$DATA_PATH" "$LOGS_PATH" "$DATA_PATH/maps" "$DATA_PATH/backups"
+            sudo mkdir -p "$DATA_PATH" "$LOGS_PATH" "$DATA_PATH/maps" "$DATA_PATH/backups" "$DATA_PATH/avatars"
 
             # Write/refresh .env with managed keys
             ENV_FILE="$DEPLOY_PATH/.env"
@@ -164,6 +164,7 @@ jobs:
             update_env LOG_LEVEL info
             update_env DB_PATH "$DATA_PATH/virtual-office.db"
             update_env OFFICE_MAPS_DIR "$DATA_PATH/maps"
+            update_env AVATARS_DIR "$DATA_PATH/avatars"
             update_env VO_BACKUP_DIR "$DATA_PATH/backups"
             update_env FRONTEND_DIST_DIR "$DEPLOY_PATH/frontend/dist"
             update_env SESSION_SECRET "$SESSION_SECRET"
