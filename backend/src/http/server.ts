@@ -39,7 +39,7 @@ export async function buildServer({ db, googleVerifier, env, hub: hubOverride }:
   });
 
   await app.register(cookie);
-  await app.register(rateLimit, { max: 100, timeWindow: "1 minute" });
+  await app.register(rateLimit, { max: 10000, timeWindow: "1 minute" });
   await app.register(multipart, {
     limits: {
       fileSize: 2 * 1024 * 1024,

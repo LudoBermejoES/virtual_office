@@ -62,6 +62,9 @@ export interface MapEditorState {
   selection: string | null;
   activeLayerName: string | null;
   isDirty: boolean;
+  /** Pilas de snapshots para undo/redo. `past` = estados anteriores; `future` = estados deshechos disponibles para rehacer. Tope `UNDO_STACK_MAX` por pila. */
+  past: MapEditorSnapshot[];
+  future: MapEditorSnapshot[];
 
   reset: (init: {
     officeId: number;
@@ -99,7 +102,16 @@ export interface MapEditorState {
   // --- snapshot/restore para undo (sección 7) ---
   snapshot: () => MapEditorSnapshot;
   restore: (snap: MapEditorSnapshot) => void;
+
+  // --- undo / redo ---
+  /** Si hay snapshots en `past`, deshace la última mutación. */
+  undo: () => void;
+  /** Si hay snapshots en `future`, rehace la última deshecha. */
+  redo: () => void;
 }
+
+/** Tope de snapshots por pila. Más allá descartamos los más antiguos. */
+export const UNDO_STACK_MAX = 50;
 
 export interface MapEditorSnapshot {
   spritesLayers: Record<string, SpritesLayerState>;
@@ -128,6 +140,21 @@ function deepCloneSpritesLayers(
   return out;
 }
 
+/**
+ * Helper interno: antes de mutar, llama esto para conservar el estado actual
+ * en la pila de undo y vaciar la pila de redo (la rama abandonada). Se invoca
+ * sólo desde acciones que modifican capas/sprites/visibilidad/orden.
+ */
+function pushUndoSnapshot(
+  get: () => MapEditorState,
+  set: (s: Partial<MapEditorState>) => void,
+): void {
+  const snap = get().snapshot();
+  const past = [...get().past, snap];
+  if (past.length > UNDO_STACK_MAX) past.shift();
+  set({ past, future: [] });
+}
+
 export const mapEditorStore = createStore<MapEditorState>()((set, get) => ({
   officeId: null,
   tmjHash: "",
@@ -140,6 +167,8 @@ export const mapEditorStore = createStore<MapEditorState>()((set, get) => ({
   selection: null,
   activeLayerName: null,
   isDirty: false,
+  past: [],
+  future: [],
 
   reset: (init) => {
     const firstSpritesLayer = init.layerOrder.find((n) => n.startsWith("sprites_"));
@@ -155,6 +184,8 @@ export const mapEditorStore = createStore<MapEditorState>()((set, get) => ({
       selection: null,
       activeLayerName: firstSpritesLayer ?? null,
       isDirty: false,
+      past: [],
+      future: [],
     });
   },
 
@@ -164,6 +195,7 @@ export const mapEditorStore = createStore<MapEditorState>()((set, get) => ({
     if (spritesLayers[name] || layerOrder.includes(name)) {
       return { ok: false, reason: "duplicate" };
     }
+    pushUndoSnapshot(get, set);
     set({
       spritesLayers: { ...spritesLayers, [name]: { name, objects: [] } },
       layerOrder: [...layerOrder, name],
@@ -177,6 +209,7 @@ export const mapEditorStore = createStore<MapEditorState>()((set, get) => ({
   removeLayer: (name) => {
     const state = get();
     if (!state.spritesLayers[name]) return;
+    pushUndoSnapshot(get, set);
     const { [name]: removed, ...restSpritesLayers } = state.spritesLayers;
     const { [name]: _v, ...restVis } = state.layersVisibility;
     void _v;
@@ -206,6 +239,7 @@ export const mapEditorStore = createStore<MapEditorState>()((set, get) => ({
     }
     if (oldName === newName) return { ok: true };
 
+    pushUndoSnapshot(get, set);
     const { [oldName]: layer, ...restSpritesLayers } = state.spritesLayers;
     const { [oldName]: visOld, ...restVis } = state.layersVisibility;
     set({
@@ -224,6 +258,7 @@ export const mapEditorStore = createStore<MapEditorState>()((set, get) => ({
     if (idx === -1) return;
     const newIdx = idx + delta;
     if (newIdx < 0 || newIdx >= layerOrder.length) return;
+    pushUndoSnapshot(get, set);
     const newOrder = [...layerOrder];
     const [item] = newOrder.splice(idx, 1);
     newOrder.splice(newIdx, 0, item!);
@@ -233,6 +268,7 @@ export const mapEditorStore = createStore<MapEditorState>()((set, get) => ({
   toggleLayerVisibility: (name) => {
     const { layersVisibility, layerOrder } = get();
     if (!layerOrder.includes(name)) return;
+    pushUndoSnapshot(get, set);
     const current = layersVisibility[name] ?? true;
     set({
       layersVisibility: { ...layersVisibility, [name]: !current },
@@ -247,6 +283,7 @@ export const mapEditorStore = createStore<MapEditorState>()((set, get) => ({
     const { spritesLayers } = get();
     const layer = spritesLayers[layerName];
     if (!layer) return editorId;
+    pushUndoSnapshot(get, set);
     set({
       spritesLayers: {
         ...spritesLayers,
@@ -262,6 +299,7 @@ export const mapEditorStore = createStore<MapEditorState>()((set, get) => ({
   },
 
   moveSprite: (editorId, x, y) => {
+    pushUndoSnapshot(get, set);
     const { spritesLayers } = get();
     const updated: Record<string, SpritesLayerState> = {};
     for (const [k, l] of Object.entries(spritesLayers)) {
@@ -274,6 +312,7 @@ export const mapEditorStore = createStore<MapEditorState>()((set, get) => ({
   },
 
   removeSprite: (editorId) => {
+    pushUndoSnapshot(get, set);
     const { spritesLayers, selection } = get();
     const updated: Record<string, SpritesLayerState> = {};
     for (const [k, l] of Object.entries(spritesLayers)) {
@@ -287,6 +326,7 @@ export const mapEditorStore = createStore<MapEditorState>()((set, get) => ({
   },
 
   setSpriteTag: (editorId, tag) => {
+    pushUndoSnapshot(get, set);
     const { spritesLayers } = get();
     const updated: Record<string, SpritesLayerState> = {};
     for (const [k, l] of Object.entries(spritesLayers)) {
@@ -331,6 +371,46 @@ export const mapEditorStore = createStore<MapEditorState>()((set, get) => ({
       selection: snap.selection,
       activeLayerName: snap.activeLayerName,
       isDirty: snap.isDirty,
+    });
+  },
+
+  undo: () => {
+    const { past, future } = get();
+    if (past.length === 0) return;
+    const previous = past[past.length - 1]!;
+    const newPast = past.slice(0, -1);
+    const currentSnap = get().snapshot();
+    const newFuture = [...future, currentSnap];
+    if (newFuture.length > UNDO_STACK_MAX) newFuture.shift();
+    set({
+      spritesLayers: deepCloneSpritesLayers(previous.spritesLayers),
+      layerOrder: [...previous.layerOrder],
+      layersVisibility: { ...previous.layersVisibility },
+      selection: previous.selection,
+      activeLayerName: previous.activeLayerName,
+      isDirty: previous.isDirty,
+      past: newPast,
+      future: newFuture,
+    });
+  },
+
+  redo: () => {
+    const { past, future } = get();
+    if (future.length === 0) return;
+    const next = future[future.length - 1]!;
+    const newFuture = future.slice(0, -1);
+    const currentSnap = get().snapshot();
+    const newPast = [...past, currentSnap];
+    if (newPast.length > UNDO_STACK_MAX) newPast.shift();
+    set({
+      spritesLayers: deepCloneSpritesLayers(next.spritesLayers),
+      layerOrder: [...next.layerOrder],
+      layersVisibility: { ...next.layersVisibility },
+      selection: next.selection,
+      activeLayerName: next.activeLayerName,
+      isDirty: next.isDirty,
+      past: newPast,
+      future: newFuture,
     });
   },
 }));

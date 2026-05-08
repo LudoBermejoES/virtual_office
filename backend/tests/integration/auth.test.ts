@@ -108,8 +108,8 @@ describe("POST /api/auth/google", () => {
     expect(body.reason).toBe("invalid_token");
   });
 
-  it("rate limit dispara 429 al 11º request en la misma ventana", async () => {
-    for (let i = 0; i < 10; i++) {
+  it("rate limit dispara 429 al sobrepasar el cupo (100/min) en la misma ventana", async () => {
+    for (let i = 0; i < 100; i++) {
       await server.app.inject({
         method: "POST",
         url: "/api/auth/google",

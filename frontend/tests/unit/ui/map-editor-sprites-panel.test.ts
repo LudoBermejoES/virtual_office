@@ -30,6 +30,7 @@ interface FakeEl {
 
 interface FakeDoc {
   body: FakeEl;
+  head: FakeEl;
   defaultView: { prompt: () => null; alert: () => void; confirm: () => boolean };
   byId: Map<string, FakeEl>;
   createElement(tag: string): FakeEl;
@@ -83,6 +84,7 @@ function makeEl(doc: FakeDoc, tag: string): FakeEl {
 function makeDoc(): FakeDoc {
   const doc: FakeDoc = {
     body: undefined as unknown as FakeEl,
+    head: undefined as unknown as FakeEl,
     defaultView: { prompt: () => null, alert: () => {}, confirm: () => true },
     byId: new Map(),
     createElement: (tag) => makeEl(doc, tag),
@@ -91,6 +93,7 @@ function makeDoc(): FakeDoc {
     },
   };
   doc.body = makeEl(doc, "body");
+  doc.head = makeEl(doc, "head");
   return doc;
 }
 
@@ -193,5 +196,45 @@ describe("MapEditorSpritesPanel", () => {
     };
     game.dispatch("drop", { dataTransfer: dt, clientX: 0, clientY: 0, preventDefault: () => {} });
     expect(onDrop).not.toHaveBeenCalled();
+  });
+
+  it("con getJsonForSprite, cada item tiene preview animada (div con animation CSS)", () => {
+    const catJson = {
+      frames: {
+        "0": { frame: { x: 0, y: 0, w: 144, h: 48 }, duration: 100 },
+        "1": { frame: { x: 144, y: 0, w: 144, h: 48 }, duration: 100 },
+        "2": { frame: { x: 288, y: 0, w: 144, h: 48 }, duration: 100 },
+      },
+      meta: {
+        frameTags: [{ name: "walk", from: 0, to: 2 }],
+      },
+    };
+    mountMapEditorSpritesPanel({
+      doc: doc as unknown as Document,
+      baseUrl: "http://x",
+      getJsonForSprite: (id) => (id === "cat" ? catJson : undefined),
+    });
+
+    // El item de cat debe tener un <div> con dataset spritePreview, no <img>
+    const previews = walk(doc.body).filter((e) => e.dataset["spritePreview"] === "cat");
+    expect(previews.length).toBe(1);
+    expect(previews[0]!.tagName).toBe("DIV");
+    expect(previews[0]!.style["animation"]).toContain("vo-sprite-anim-cat");
+    expect(previews[0]!.style["animation"]).toContain("steps(3)");
+
+    // Los keyframes están inyectados en un <style> dentro de head
+    const styleEls = walk(doc.head).filter((e) => e.tagName === "STYLE");
+    expect(styleEls.length).toBeGreaterThan(0);
+    const css = styleEls[0]!.textContent;
+    expect(css).toContain("@keyframes vo-sprite-anim-cat");
+    // 3 frames de 144x48 escalados a alto 32 → ancho frame 96 → total 288.
+    expect(css).toContain("-288px");
+  });
+
+  it("sin getJsonForSprite, fallback a <img> estática", () => {
+    mountMapEditorSpritesPanel({ doc: doc as unknown as Document, baseUrl: "http://x" });
+    const cat = walk(doc.body).find((e) => e.dataset["spriteId"] === "cat");
+    const img = walk(cat!).find((e) => e.tagName === "IMG");
+    expect(img).toBeDefined();
   });
 });

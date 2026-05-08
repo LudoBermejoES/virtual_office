@@ -33,7 +33,7 @@ export async function authRoutes(
   app.post(
     "/api/auth/google",
     {
-      config: { rateLimit: { max: 10, timeWindow: "1 minute" } },
+      config: { rateLimit: { max: 100, timeWindow: "1 minute" } },
     },
     async (request, reply) => {
       const body = z

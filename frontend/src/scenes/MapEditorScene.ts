@@ -284,6 +284,7 @@ export class MapEditorScene extends Phaser.Scene {
       baseUrl: BASE_URL,
       onDropOnCanvas: (spriteName, clientX, clientY) =>
         this.handleSpriteDrop(spriteName, clientX, clientY),
+      getJsonForSprite: (spriteId) => this.cache.json.get(spriteId),
     });
     mountMapEditorSpritePopover({
       getTagsForSprite: (spriteName) => this.getFrameTagsForSprite(spriteName),
@@ -527,6 +528,21 @@ export class MapEditorScene extends Phaser.Scene {
 
     this.input.keyboard?.on("keydown-DELETE", () => this.handleDeleteSelection());
     this.input.keyboard?.on("keydown-BACKSPACE", () => this.handleDeleteSelection());
+
+    // Undo/redo: Ctrl+Z / Cmd+Z para undo, Ctrl+Shift+Z / Cmd+Shift+Z para redo.
+    // Phaser dispara `keydown-Z` con el evento DOM original; leemos los flags
+    // ctrlKey/metaKey/shiftKey del evento.
+    this.input.keyboard?.on("keydown-Z", (event: KeyboardEvent) => {
+      const mod = event.ctrlKey || event.metaKey;
+      if (!mod) return;
+      if (event.repeat) return;
+      event.preventDefault?.();
+      if (event.shiftKey) {
+        mapEditorStore.getState().redo();
+      } else {
+        mapEditorStore.getState().undo();
+      }
+    });
   }
 
   private handleSpriteClick(editorId: string, pointer: Phaser.Input.Pointer): void {
