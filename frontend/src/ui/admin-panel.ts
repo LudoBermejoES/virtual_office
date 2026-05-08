@@ -1,7 +1,8 @@
 import { BASE_URL } from "../config.js";
 import { officesStore } from "../state/offices.js";
+import { renderRecurrenciasTab } from "./admin-recurrencias-tab.js";
 
-const TABS = ["OFICINAS", "USUARIOS", "FIJOS"] as const;
+const TABS = ["OFICINAS", "USUARIOS", "FIJOS", "RECURRENCIAS"] as const;
 type Tab = (typeof TABS)[number];
 
 let panelEl: HTMLDivElement | null = null;
@@ -110,6 +111,7 @@ export function mountAdminPanel(initialTab: Tab = "OFICINAS", preselectedDeskId?
     if (tab === "OFICINAS") renderOficinas(content);
     else if (tab === "USUARIOS") renderUsuarios(content);
     else if (tab === "FIJOS") renderFijos(content, preselectedDeskId);
+    else if (tab === "RECURRENCIAS") renderRecurrencias(content);
   }
 
   for (const tab of TABS) {
@@ -1112,6 +1114,27 @@ function renderFijos(container: HTMLElement, preselectedDeskId?: number): void {
       const initialId = parseInt(sel.value, 10);
       loadDesks(initialId);
       loadFijos(initialId);
+    })
+    .catch(() => {
+      container.innerHTML = '<p style="color:#e33636;font-size:10px">Error al cargar.</p>';
+    });
+}
+
+// ── Recurrencias tab (change 029) ────────────────────────────────────────────
+
+function renderRecurrencias(container: HTMLElement): void {
+  container.innerHTML = '<p style="color:#8e92a8;font-size:10px">Cargando oficinas…</p>';
+
+  fetch(`${BASE_URL}/api/offices`, { credentials: "include" })
+    .then((r) => r.json())
+    .then((offices: Array<{ id: number; name: string; is_admin?: boolean }>) => {
+      const adminOffices = offices.filter((o) => o.is_admin !== false);
+      renderRecurrenciasTab({
+        doc: document,
+        container,
+        baseUrl: BASE_URL,
+        offices: adminOffices.map((o) => ({ id: o.id, name: o.name })),
+      });
     })
     .catch(() => {
       container.innerHTML = '<p style="color:#e33636;font-size:10px">Error al cargar.</p>';

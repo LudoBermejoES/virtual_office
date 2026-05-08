@@ -340,4 +340,43 @@ describe("GET /api/offices/:id/weekly", () => {
     });
     expect(res.statusCode).toBe(403);
   });
+
+  it("incluye exceptions[] futuras ordenadas por fecha", async () => {
+    // Dos excepciones futuras para la weekly del primer desk (lunes, dow=0).
+    // Buscamos lunes futuros lejanos para que no caduquen.
+    const list = await server.app.inject({
+      method: "GET",
+      url: `/api/offices/${officeId}/weekly`,
+      headers: { cookie: aliceCookie },
+    });
+    const before = list.json<Array<{ id: number; dow: number }>>();
+    const weeklyMonId = before.find((w) => w.dow === 0)!.id;
+
+    // Insertamos dos excepciones futuras out-of-order
+    await server.app.inject({
+      method: "POST",
+      url: `/api/desks/${deskIds[0]}/weekly/${weeklyMonId}/exceptions`,
+      headers: { cookie: aliceCookie },
+      payload: { date: "2099-01-12" }, // lunes
+    });
+    await server.app.inject({
+      method: "POST",
+      url: `/api/desks/${deskIds[0]}/weekly/${weeklyMonId}/exceptions`,
+      headers: { cookie: aliceCookie },
+      payload: { date: "2099-01-05" }, // lunes
+    });
+
+    const res = await server.app.inject({
+      method: "GET",
+      url: `/api/offices/${officeId}/weekly`,
+      headers: { cookie: aliceCookie },
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json<Array<{ id: number; exceptions: string[] }>>();
+    const enriched = body.find((w) => w.id === weeklyMonId)!;
+    expect(enriched.exceptions).toEqual(["2099-01-05", "2099-01-12"]);
+
+    const other = body.find((w) => w.id !== weeklyMonId)!;
+    expect(other.exceptions).toEqual([]);
+  });
 });

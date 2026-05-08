@@ -81,6 +81,8 @@ export interface WeeklyAssignmentDetail {
   user: { id: number; name: string; email: string; avatar_url: string | null };
   dow: number;
   created_at: string;
+  /** Fechas ISO de excepciones futuras (`date >= DATE('now')`), orden ascendente. */
+  exceptions: string[];
 }
 
 export function listByOffice(db: DatabaseSync, officeId: number): WeeklyAssignmentDetail[] {
@@ -107,12 +109,29 @@ export function listByOffice(db: DatabaseSync, officeId: number): WeeklyAssignme
     user_email: string;
     user_avatar_url: string | null;
   }>;
+  if (rows.length === 0) return [];
+  const ids = rows.map((r) => r.id);
+  const placeholders = ids.map(() => "?").join(",");
+  const exRows = db
+    .prepare(
+      `SELECT weekly_assignment_id, date FROM weekly_assignment_exceptions
+       WHERE weekly_assignment_id IN (${placeholders}) AND date >= DATE('now')
+       ORDER BY date ASC`,
+    )
+    .all(...ids) as Array<{ weekly_assignment_id: number; date: string }>;
+  const byWeekly = new Map<number, string[]>();
+  for (const ex of exRows) {
+    const arr = byWeekly.get(ex.weekly_assignment_id) ?? [];
+    arr.push(ex.date);
+    byWeekly.set(ex.weekly_assignment_id, arr);
+  }
   return rows.map((r) => ({
     id: r.id,
     desk: { id: r.desk_id, label: r.desk_label },
     user: { id: r.user_id, name: r.user_name, email: r.user_email, avatar_url: r.user_avatar_url },
     dow: r.dow,
     created_at: r.created_at,
+    exceptions: byWeekly.get(r.id) ?? [],
   }));
 }
 
