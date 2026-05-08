@@ -20,8 +20,22 @@ export async function bookingsRoutes(
     const params = z.object({ id: z.coerce.number().int().positive() }).safeParse(request.params);
     if (!params.success) return reply.status(400).send({ reason: "bad_request" });
 
-    const body = z.object({ date: z.string() }).safeParse(request.body);
+    // userId es opcional: cuando lo manda un admin, reserva en nombre del
+    // usuario destino. Members no pueden mandarlo (403). Ver change 026.
+    const body = z
+      .object({ date: z.string(), userId: z.number().int().positive().optional() })
+      .safeParse(request.body);
     if (!body.success) return reply.status(400).send({ reason: "bad_request" });
+
+    const me = request.user!;
+    const requestedUserId = body.data.userId;
+    if (requestedUserId !== undefined && requestedUserId !== me.id) {
+      if (me.role !== "admin") return reply.status(403).send({ reason: "forbidden" });
+      const target = findUserById(db, requestedUserId);
+      if (!target) return reply.status(404).send({ reason: "user_not_found" });
+    }
+    const effectiveUserId = requestedUserId ?? me.id;
+    const isAdminBookingForOther = requestedUserId !== undefined && requestedUserId !== me.id;
 
     const parsedDate = parseIsoDate(body.data.date);
     if (!parsedDate.ok) return reply.status(422).send({ reason: "invalid_date" });
@@ -44,7 +58,7 @@ export async function bookingsRoutes(
     try {
       const booking = bookingsRepo.createBooking(db, {
         desk_id: desk.id,
-        user_id: request.user!.id,
+        user_id: effectiveUserId,
         date: parsedDate.date,
         type: "daily",
       });
@@ -57,12 +71,22 @@ export async function bookingsRoutes(
           user: { id: user.id, name: user.name, avatar_url: user.avatar_url },
         });
       }
-      logger.info("booking.created", {
-        bookingId: booking.id,
-        deskId: desk.id,
-        userId: booking.user_id,
-        date: booking.date,
-      });
+      if (isAdminBookingForOther) {
+        logger.info("booking.created.byAdmin", {
+          bookingId: booking.id,
+          deskId: desk.id,
+          adminId: me.id,
+          targetUserId: booking.user_id,
+          date: booking.date,
+        });
+      } else {
+        logger.info("booking.created", {
+          bookingId: booking.id,
+          deskId: desk.id,
+          userId: booking.user_id,
+          date: booking.date,
+        });
+      }
       return reply.status(201).send({ booking });
     } catch (e) {
       if (e instanceof UniqueViolation) {
@@ -79,8 +103,20 @@ export async function bookingsRoutes(
     const params = z.object({ id: z.coerce.number().int().positive() }).safeParse(request.params);
     if (!params.success) return reply.status(400).send({ reason: "bad_request" });
 
-    const body = z.object({ date: z.string() }).safeParse(request.body);
+    // userId es opcional: cuando lo manda un admin, libera la reserva del
+    // usuario destino. Members no pueden mandarlo (403). Ver change 026.
+    const body = z
+      .object({ date: z.string(), userId: z.number().int().positive().optional() })
+      .safeParse(request.body);
     if (!body.success) return reply.status(400).send({ reason: "bad_request" });
+
+    const me = request.user!;
+    const requestedUserId = body.data.userId;
+    if (requestedUserId !== undefined && requestedUserId !== me.id && me.role !== "admin") {
+      return reply.status(403).send({ reason: "forbidden" });
+    }
+    const isAdminReleasingForOther =
+      requestedUserId !== undefined && requestedUserId !== me.id && me.role === "admin";
 
     const parsedDate = parseIsoDate(body.data.date);
     if (!parsedDate.ok) return reply.status(422).send({ reason: "invalid_date" });
@@ -91,7 +127,6 @@ export async function bookingsRoutes(
     });
     if (!existing) return reply.status(404).send({ reason: "not_found" });
 
-    const me = request.user!;
     if (existing.user_id !== me.id && me.role !== "admin") {
       return reply.status(403).send({ reason: "forbidden" });
     }
@@ -100,13 +135,23 @@ export async function bookingsRoutes(
     }
 
     bookingsRepo.deleteBy(db, { desk_id: params.data.id, date: parsedDate.date });
-    logger.info("booking.deleted", {
-      bookingId: existing.id,
-      deskId: params.data.id,
-      userId: existing.user_id,
-      date: parsedDate.date,
-      deletedBy: me.id,
-    });
+    if (isAdminReleasingForOther) {
+      logger.info("booking.deleted.byAdmin", {
+        bookingId: existing.id,
+        deskId: params.data.id,
+        adminId: me.id,
+        targetUserId: existing.user_id,
+        date: parsedDate.date,
+      });
+    } else {
+      logger.info("booking.deleted", {
+        bookingId: existing.id,
+        deskId: params.data.id,
+        userId: existing.user_id,
+        date: parsedDate.date,
+        deletedBy: me.id,
+      });
+    }
     const desk = desksRepo.findDeskById(db, params.data.id);
     if (desk) {
       hub.broadcast(officeRoom(desk.office_id), {

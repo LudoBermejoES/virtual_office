@@ -13,6 +13,8 @@ import { deskState } from "../domain/desk-state.js";
 import { connectOffice } from "../realtime/socket.js";
 import { uiStore, shouldApply } from "../state/ui.js";
 import { officesStore } from "../state/offices.js";
+import { mountAdminBookModal, unmountAdminBookModal } from "../ui/admin-book-modal.js";
+import type { AdminBookModalUser } from "../ui/admin-book-modal.js";
 import type { ConnectHandle } from "../realtime/socket.js";
 import type { WsServerMessage } from "@virtual-office/shared";
 import type { Desk, OfficeDetail } from "../state/office.js";
@@ -481,14 +483,18 @@ export class OfficeScene extends Phaser.Scene {
       }
       return;
     }
+    const isAdmin = officesStore.getState().meRole === "admin";
+
+    // Admin: en lugar de la acción directa, abrir el modal del change 026 que
+    // permite reservar/liberar a nombre de cualquier usuario.
+    if (isAdmin) {
+      await this.openAdminBookModal(desk, state);
+      return;
+    }
+
     if (state === "occupied") {
       const b = this.detail.bookings.find((x) => x.deskId === desk.id);
-      const isAdmin = officesStore.getState().meRole === "admin";
-      if (isAdmin && window.confirm(`¿Liberar el puesto de ${b?.user.name ?? "otro usuario"}?`)) {
-        await this.releaseDesk(desk);
-      } else if (!isAdmin) {
-        this.showFeedback(`Ocupado por ${b?.user.name ?? "otro usuario"}`);
-      }
+      this.showFeedback(`Ocupado por ${b?.user.name ?? "otro usuario"}`);
       return;
     }
 
@@ -515,6 +521,104 @@ export class OfficeScene extends Phaser.Scene {
       if (!window.confirm(`¿Reservar ${desk.label} el ${dateLabel}?`)) return;
     }
     await this.reserveDesk(desk);
+  }
+
+  /**
+   * Modal admin del change 026 — permite al admin reservar el desk a nombre de
+   * cualquier usuario, o liberar la reserva de quien sea. El modal no toca
+   * desks con `state === "fixed"` (esos siguen el flujo skip/unskip ya
+   * existente en `handleDeskClick`).
+   */
+  private async openAdminBookModal(
+    desk: Desk,
+    state: "free" | "mine" | "occupied" | "fixed",
+  ): Promise<void> {
+    if (!this.detail) return;
+    if (state === "fixed") return; // gestionado fuera
+
+    const dateIso = this.detail.date;
+    const dateLabel = formatDateEs(dateIso);
+
+    if (state === "occupied" || state === "mine") {
+      const booking = this.detail.bookings.find((b) => b.deskId === desk.id);
+      if (!booking) return;
+      mountAdminBookModal({
+        deskLabel: desk.label,
+        dateLabel,
+        mode: {
+          kind: "release",
+          bookedBy: {
+            id: booking.user.id,
+            email: "",
+            name: booking.user.name,
+            avatar_url: booking.user.avatar_url,
+          },
+        },
+        onConfirmRelease: async () => {
+          await this.releaseDeskFor(desk, booking.user.id);
+          unmountAdminBookModal();
+        },
+      });
+      return;
+    }
+
+    // free → cargar lista de usuarios
+    let users: AdminBookModalUser[] = [];
+    try {
+      const res = await fetch(`${BASE_URL}/api/users`, { credentials: "include" });
+      if (!res.ok) {
+        this.showFeedback(`Error cargando usuarios: ${res.status}`);
+        return;
+      }
+      users = (await res.json()) as AdminBookModalUser[];
+    } catch {
+      this.showFeedback("Error de red cargando usuarios");
+      return;
+    }
+
+    mountAdminBookModal({
+      deskLabel: desk.label,
+      dateLabel,
+      mode: { kind: "book", users, meId: this.meId },
+      onConfirmBook: async (userId) => {
+        await this.reserveDeskFor(desk, userId);
+        unmountAdminBookModal();
+      },
+    });
+  }
+
+  private async reserveDeskFor(desk: Desk, userId: number): Promise<void> {
+    if (!this.detail) return;
+    const date = this.detail.date;
+    const res = await fetch(`${BASE_URL}/api/desks/${desk.id}/bookings`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ date, userId }),
+    });
+    if (res.ok) {
+      await this.refreshSnapshot();
+      return;
+    }
+    const err = (await res.json().catch(() => ({}))) as { reason?: string };
+    this.showFeedback(`Error: ${err.reason ?? res.status}`);
+  }
+
+  private async releaseDeskFor(desk: Desk, userId: number): Promise<void> {
+    if (!this.detail) return;
+    const date = this.detail.date;
+    const res = await fetch(`${BASE_URL}/api/desks/${desk.id}/bookings`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ date, userId }),
+    });
+    if (res.status === 204) {
+      await this.refreshSnapshot();
+      return;
+    }
+    const err = (await res.json().catch(() => ({}))) as { reason?: string };
+    this.showFeedback(`Error: ${err.reason ?? res.status}`);
   }
 
   private async skipFixedDay(desk: Desk): Promise<void> {
