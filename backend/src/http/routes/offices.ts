@@ -666,8 +666,16 @@ export async function officesRoutes(
       : filename.endsWith(".png")
         ? "image/png"
         : "image/webp";
+    // El TMJ tiene filename estable (`map.tmj`) desde el change 024 y se
+    // reescribe in-place con cada PATCH del editor (change 024). NO podemos
+    // cachearlo como immutable o el navegador servirá un TMJ viejo. Los
+    // tilesets sí son content-addressed (`tile_<sha>.{png,webp}`), siguen
+    // immutable.
+    const cacheControl = filename.endsWith(".tmj")
+      ? "no-cache, must-revalidate"
+      : "public, max-age=31536000, immutable";
     reply
-      .header("Cache-Control", "public, max-age=31536000, immutable")
+      .header("Cache-Control", cacheControl)
       .header("X-Content-Type-Options", "nosniff")
       .type(contentType);
     return reply.send(createReadStream(result.absPath));

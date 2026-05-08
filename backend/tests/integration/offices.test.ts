@@ -496,14 +496,18 @@ describe("/maps/:officeId/:filename serving", () => {
     rmSync(mapsDir, { recursive: true, force: true });
   });
 
-  it("sirve el .tmj con application/json + cabeceras inmutables + nosniff", async () => {
+  it("sirve el .tmj con application/json + Cache-Control no-cache + nosniff", async () => {
+    // El TMJ tiene filename estable (`map.tmj`) desde el change 024 y se
+    // reescribe in-place con cada PATCH del editor, así que NO puede ser
+    // immutable. Los tilesets sí (content-addressed por hash).
     const res = await server.app.inject({
       method: "GET",
       url: `/maps/${officeId}/${tmjFilename}`,
     });
     expect(res.statusCode).toBe(200);
     expect(res.headers["content-type"]).toContain("application/json");
-    expect(res.headers["cache-control"]).toContain("immutable");
+    expect(res.headers["cache-control"]).toContain("no-cache");
+    expect(res.headers["cache-control"]).not.toContain("immutable");
     expect(res.headers["x-content-type-options"]).toBe("nosniff");
   });
 
