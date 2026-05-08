@@ -562,29 +562,108 @@ export class OfficeScene extends Phaser.Scene {
       return;
     }
 
-    // free → cargar lista de usuarios
+    // free → cargar lista de usuarios y weeklies de la oficina
     let users: AdminBookModalUser[] = [];
+    let officeWeeklies: Array<{
+      id: number;
+      desk: { id: number; label: string };
+      user: { id: number; name: string; email: string; avatar_url: string | null };
+      dow: number;
+    }> = [];
     try {
-      const res = await fetch(`${BASE_URL}/api/users`, { credentials: "include" });
-      if (!res.ok) {
-        this.showFeedback(`Error cargando usuarios: ${res.status}`);
+      const [usersRes, weeklyRes] = await Promise.all([
+        fetch(`${BASE_URL}/api/users`, { credentials: "include" }),
+        fetch(`${BASE_URL}/api/offices/${this.detail.office.id}/weekly`, {
+          credentials: "include",
+        }),
+      ]);
+      if (!usersRes.ok) {
+        this.showFeedback(`Error cargando usuarios: ${usersRes.status}`);
         return;
       }
-      users = (await res.json()) as AdminBookModalUser[];
+      users = (await usersRes.json()) as AdminBookModalUser[];
+      // weeklyRes puede fallar 403 si caller no es admin — improbable aquí
+      // pero no bloqueante. Tratamos como lista vacía.
+      if (weeklyRes.ok) {
+        officeWeeklies = (await weeklyRes.json()) as typeof officeWeeklies;
+      }
     } catch {
       this.showFeedback("Error de red cargando usuarios");
       return;
     }
 
+    // Construye mapas para el modal:
+    //  - weeklyByUser: lo que ya hay en ESTE desk (preselección checkboxes).
+    //  - conflictingDowsByUser: dows ocupados en OTROS desks (disabled).
+    const weeklyByUser: Record<string, Array<{ dow: number; weeklyId: number }>> = {};
+    const conflictingDowsByUser: Record<string, number[]> = {};
+    for (const w of officeWeeklies) {
+      const key = String(w.user.id);
+      if (w.desk.id === desk.id) {
+        if (!weeklyByUser[key]) weeklyByUser[key] = [];
+        weeklyByUser[key].push({ dow: w.dow, weeklyId: w.id });
+      } else {
+        if (!conflictingDowsByUser[key]) conflictingDowsByUser[key] = [];
+        conflictingDowsByUser[key].push(w.dow);
+      }
+    }
+
     mountAdminBookModal({
       deskLabel: desk.label,
       dateLabel,
-      mode: { kind: "book", users, meId: this.meId },
-      onConfirmBook: async (userId) => {
-        await this.reserveDeskFor(desk, userId);
+      mode: {
+        kind: "book",
+        users,
+        meId: this.meId,
+        weeklyByUser,
+        conflictingDowsByUser,
+      },
+      onConfirmBook: async (userId, weeklyChanges) => {
+        // 1) Aplicar cambios de weeklies en serie. Si alguna falla, paramos
+        //    y reportamos en el HUD; los cambios anteriores se mantienen.
+        for (const id of weeklyChanges.deleteIds) {
+          const ok = await this.deleteWeekly(desk.id, id);
+          if (!ok) return;
+        }
+        for (const c of weeklyChanges.create) {
+          const ok = await this.createWeekly(desk.id, c.userId, c.dow);
+          if (!ok) return;
+        }
+        // 2) Si el admin además seleccionó un user para reserva diaria,
+        //    crearla. Si solo gestionaba weeklies sin reservar el día, userId
+        //    puede venir null.
+        if (userId !== null) {
+          await this.reserveDeskFor(desk, userId);
+        } else {
+          await this.refreshSnapshot();
+        }
         unmountAdminBookModal();
       },
     });
+  }
+
+  private async createWeekly(deskId: number, userId: number, dow: number): Promise<boolean> {
+    const res = await fetch(`${BASE_URL}/api/desks/${deskId}/weekly`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ userId, dow }),
+    });
+    if (res.ok) return true;
+    const err = (await res.json().catch(() => ({}))) as { reason?: string };
+    this.showFeedback(`Error weekly: ${err.reason ?? String(res.status)}`);
+    return false;
+  }
+
+  private async deleteWeekly(deskId: number, weeklyId: number): Promise<boolean> {
+    const res = await fetch(`${BASE_URL}/api/desks/${deskId}/weekly/${weeklyId}`, {
+      method: "DELETE",
+      credentials: "include",
+    });
+    if (res.status === 204 || res.ok) return true;
+    const err = (await res.json().catch(() => ({}))) as { reason?: string };
+    this.showFeedback(`Error weekly delete: ${err.reason ?? String(res.status)}`);
+    return false;
   }
 
   private async reserveDeskFor(desk: Desk, userId: number): Promise<void> {

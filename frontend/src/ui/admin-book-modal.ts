@@ -22,8 +22,38 @@ export interface AdminBookModalUser {
   avatar_url: string | null;
 }
 
+/**
+ * Mapa de weeklies activas en ESTE desk para cada usuario (change 027).
+ * key = userId, value = lista de `[dow, weeklyId]` (necesitamos el id para
+ * borrar al desmarcar).
+ */
+export type WeeklyByUser = Record<string, Array<{ dow: number; weeklyId: number }>>;
+
+/**
+ * Mapa de weeklies que cada user tiene en OTROS desks. Cada par (user, dow)
+ * deshabilita el checkbox correspondiente en este modal. key = userId, value
+ * = lista de dows ocupados.
+ */
+export type ConflictingDowsByUser = Record<string, number[]>;
+
+/** Cambios acumulados al guardar el modal en modo book (change 027). */
+export interface WeeklyChanges {
+  /** Pares (userId, dow) a crear como weekly_assignments en este desk. */
+  create: Array<{ userId: number; dow: number }>;
+  /** Ids de weeklies existentes a borrar. */
+  deleteIds: number[];
+}
+
 export type AdminBookModalMode =
-  | { kind: "book"; users: AdminBookModalUser[]; meId: number }
+  | {
+      kind: "book";
+      users: AdminBookModalUser[];
+      meId: number;
+      /** Weeklies actuales de cada user en este desk. Por defecto vacío. */
+      weeklyByUser?: WeeklyByUser;
+      /** Dows ocupados por user en otros desks. Por defecto vacío. */
+      conflictingDowsByUser?: ConflictingDowsByUser;
+    }
   | { kind: "release"; bookedBy: AdminBookModalUser }
   | { kind: "fixed"; assignedTo: AdminBookModalUser };
 
@@ -34,8 +64,12 @@ export interface AdminBookModalOpts {
   dateLabel: string;
   /** Modo del modal. */
   mode: AdminBookModalMode;
-  /** Llamado al confirmar reserva. */
-  onConfirmBook?: (userId: number) => void | Promise<void>;
+  /**
+   * Llamado al confirmar reserva. `userId` puede ser null si el admin no
+   * seleccionó usuario (solo cambió checkboxes). `weeklyChanges` contiene los
+   * deltas pendientes de aplicar a la API de weekly_assignments.
+   */
+  onConfirmBook?: (userId: number | null, weeklyChanges: WeeklyChanges) => void | Promise<void>;
   /** Llamado al confirmar liberar. */
   onConfirmRelease?: () => void | Promise<void>;
   /** Llamado al desmontar (ESC, click fuera, X). */
@@ -143,11 +177,19 @@ export function unmountAdminBookModal(): void {
   overlayEl = null;
 }
 
+const DOW_LABELS = ["L", "M", "X", "J", "V", "S", "D"] as const;
+
 function renderBookMode(
   doc: Document,
   box: HTMLElement,
   opts: AdminBookModalOpts,
-  mode: { kind: "book"; users: AdminBookModalUser[]; meId: number },
+  mode: {
+    kind: "book";
+    users: AdminBookModalUser[];
+    meId: number;
+    weeklyByUser?: WeeklyByUser;
+    conflictingDowsByUser?: ConflictingDowsByUser;
+  },
 ): void {
   // Ordenar usuarios: yo primero, resto alfabético por name (case-insensitive).
   const me = mode.users.find((u) => u.id === mode.meId);
@@ -157,6 +199,28 @@ function renderBookMode(
   const ordered = me ? [me, ...others] : others;
 
   let selectedUserId: number | null = me?.id ?? null;
+
+  // Estado inicial de weeklies por usuario en este desk (set de dows).
+  const initialDowsByUser = new Map<number, Set<number>>();
+  // Mapa (userId, dow) → weeklyId para borrar al desmarcar.
+  const weeklyIdAt = new Map<string, number>();
+  for (const [userIdStr, weeklies] of Object.entries(mode.weeklyByUser ?? {})) {
+    const userId = Number(userIdStr);
+    const set = new Set<number>();
+    for (const w of weeklies) {
+      set.add(w.dow);
+      weeklyIdAt.set(`${String(userId)}:${String(w.dow)}`, w.weeklyId);
+    }
+    initialDowsByUser.set(userId, set);
+  }
+
+  // Estado actual (mutable). Inicializamos desde el inicial.
+  const currentDowsByUser = new Map<number, Set<number>>();
+  for (const [u, dows] of initialDowsByUser) {
+    currentDowsByUser.set(u, new Set(dows));
+  }
+
+  const conflictingDowsByUser = mode.conflictingDowsByUser ?? {};
 
   const filterInput = doc.createElement("input");
   filterInput.id = "admin-book-modal-filter";
@@ -178,13 +242,34 @@ function renderBookMode(
   const listEl = doc.createElement("div");
   listEl.id = "admin-book-modal-list";
   Object.assign(listEl.style, {
-    maxHeight: "260px",
+    maxHeight: "320px",
     overflowY: "auto",
     border: "1px solid #444",
     background: "#0b0d1a",
     marginBottom: "12px",
   });
   box.appendChild(listEl);
+
+  const computeChanges = (): WeeklyChanges => {
+    const create: WeeklyChanges["create"] = [];
+    const deleteIds: number[] = [];
+    // Recorremos ambos lados para detectar diffs.
+    const allUsers = new Set<number>([...initialDowsByUser.keys(), ...currentDowsByUser.keys()]);
+    for (const userId of allUsers) {
+      const initial = initialDowsByUser.get(userId) ?? new Set<number>();
+      const current = currentDowsByUser.get(userId) ?? new Set<number>();
+      for (const dow of current) {
+        if (!initial.has(dow)) create.push({ userId, dow });
+      }
+      for (const dow of initial) {
+        if (!current.has(dow)) {
+          const id = weeklyIdAt.get(`${String(userId)}:${String(dow)}`);
+          if (id !== undefined) deleteIds.push(id);
+        }
+      }
+    }
+    return { create, deleteIds };
+  };
 
   const renderList = (filter: string): void => {
     listEl.innerHTML = "";
@@ -205,17 +290,27 @@ function renderBookMode(
     for (const u of filtered) {
       const isMe = u.id === mode.meId;
       const isSelected = u.id === selectedUserId;
+      const userDows = currentDowsByUser.get(u.id) ?? new Set<number>();
+      const conflictingDows = new Set(conflictingDowsByUser[String(u.id)] ?? []);
+
       const row = doc.createElement("div");
       row.dataset["userId"] = String(u.id);
       Object.assign(row.style, {
         padding: "6px 8px",
-        cursor: "pointer",
         background: isSelected ? "#36e36c" : "transparent",
         color: isSelected ? "#0b0d1a" : "#e5e5e5",
         borderBottom: "1px solid #1a1c30",
         fontSize: "9px",
+        display: "flex",
+        alignItems: "center",
+        gap: "8px",
       });
-      row.textContent = isMe ? `${u.name} (yo)` : u.name;
+
+      // Bloque nombre + email (clickable para seleccionar usuario)
+      const labelWrap = doc.createElement("div");
+      labelWrap.style.flex = "1";
+      labelWrap.style.cursor = "pointer";
+      labelWrap.textContent = isMe ? `${u.name} (yo)` : u.name;
       const email = doc.createElement("div");
       email.textContent = u.email;
       Object.assign(email.style, {
@@ -223,11 +318,66 @@ function renderBookMode(
         fontSize: "7px",
         marginTop: "2px",
       });
-      row.appendChild(email);
-      row.addEventListener("click", () => {
+      labelWrap.appendChild(email);
+      labelWrap.addEventListener("click", () => {
         selectedUserId = u.id;
         renderList(filterInput.value);
       });
+      row.appendChild(labelWrap);
+
+      // Rejilla de 7 checkboxes L M X J V S D
+      const dowGrid = doc.createElement("div");
+      dowGrid.dataset["dowGridFor"] = String(u.id);
+      Object.assign(dowGrid.style, { display: "flex", gap: "2px" });
+      for (let dow = 0; dow < 7; dow++) {
+        const cell = doc.createElement("label");
+        cell.dataset["dow"] = String(dow);
+        const isConflict = conflictingDows.has(dow);
+        const isChecked = userDows.has(dow);
+        Object.assign(cell.style, {
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          fontSize: "7px",
+          color: isSelected ? "#0b0d1a" : isConflict ? "#666" : "#8e92a8",
+          cursor: isConflict ? "not-allowed" : "pointer",
+          opacity: isConflict ? "0.4" : "1",
+        });
+        cell.title = isConflict
+          ? `${u.name} ya tiene un fijo semanal en otro puesto este día`
+          : `${DOW_LABELS[dow]} de ${u.name}`;
+
+        const cb = doc.createElement("input");
+        cb.type = "checkbox";
+        cb.checked = isChecked;
+        cb.disabled = isConflict;
+        cb.dataset["userId"] = String(u.id);
+        cb.dataset["dow"] = String(dow);
+        Object.assign(cb.style, { margin: "0", cursor: isConflict ? "not-allowed" : "pointer" });
+        cb.addEventListener("click", (ev) => {
+          ev.stopPropagation();
+          if (isConflict) return;
+          const set = currentDowsByUser.get(u.id) ?? new Set<number>();
+          if (cb.checked) set.add(dow);
+          else set.delete(dow);
+          currentDowsByUser.set(u.id, set);
+          // Re-renderizar para reflejar el cambio en otros checkboxes
+          // potencialmente afectados (no hay propagación cruzada por ahora).
+        });
+        cell.appendChild(cb);
+
+        const labelText = doc.createElement("span");
+        labelText.textContent = DOW_LABELS[dow]!;
+        cell.appendChild(labelText);
+
+        // Click en el label/cell también toggle del checkbox
+        cell.addEventListener("click", (ev) => {
+          ev.stopPropagation();
+        });
+        dowGrid.appendChild(cell);
+      }
+      row.appendChild(dowGrid);
+
       listEl.appendChild(row);
     }
   };
@@ -246,11 +396,10 @@ function renderBookMode(
   });
   btnRow.appendChild(cancelBtn);
 
-  const confirmBtn = makeButton(doc, "Reservar", "#36e36c");
+  const confirmBtn = makeButton(doc, "Guardar", "#36e36c");
   confirmBtn.id = "admin-book-modal-confirm";
   confirmBtn.addEventListener("click", () => {
-    if (selectedUserId === null) return;
-    void opts.onConfirmBook?.(selectedUserId);
+    void opts.onConfirmBook?.(selectedUserId, computeChanges());
   });
   btnRow.appendChild(confirmBtn);
 }

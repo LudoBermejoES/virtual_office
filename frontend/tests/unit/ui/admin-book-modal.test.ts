@@ -9,9 +9,12 @@ interface FakeEl {
   tagName: string;
   id: string;
   textContent: string;
+  title: string;
   type: string;
   value: string;
   placeholder: string;
+  checked: boolean;
+  disabled: boolean;
   style: Record<string, string>;
   dataset: Record<string, string>;
   children: FakeEl[];
@@ -43,9 +46,12 @@ function makeEl(doc: FakeDoc, tag: string): FakeEl {
     tagName: tag.toUpperCase(),
     id: "",
     textContent: "",
+    title: "",
     type: "",
     value: "",
     placeholder: "",
+    checked: false,
+    disabled: false,
     style: {},
     dataset: {},
     children: [],
@@ -190,9 +196,16 @@ describe("admin-book-modal — modo book", () => {
       dateLabel: "hoy",
       mode: { kind: "book", users: [charlieUser, bobUser, meUser], meId: 1 },
     });
-    const rows = walk(doc.body).filter((e) => e.dataset["userId"]);
+    // Filtramos solo las filas DIV (no checkboxes ni labels) por user.
+    const rows = walk(doc.body).filter(
+      (e) => e.tagName === "DIV" && e.dataset["userId"] !== undefined,
+    );
     expect(rows.map((r) => r.dataset["userId"])).toEqual(["1", "2", "3"]);
-    expect(rows[0]!.textContent).toContain("(yo)");
+    // El "(yo)" vive dentro del labelWrap del primer row.
+    const firstRowText = walk(rows[0]!)
+      .map((e) => e.textContent)
+      .join(" ");
+    expect(firstRowText).toContain("(yo)");
   });
 
   it("filtro reduce la lista en tiempo real", () => {
@@ -205,11 +218,13 @@ describe("admin-book-modal — modo book", () => {
     const filter = doc.getElementById("admin-book-modal-filter")!;
     filter.value = "bob";
     filter.dispatch("input");
-    const rows = walk(doc.body).filter((e) => e.dataset["userId"]);
+    const rows = walk(doc.body).filter(
+      (e) => e.tagName === "DIV" && e.dataset["userId"] !== undefined,
+    );
     expect(rows.map((r) => r.dataset["userId"])).toEqual(["2"]);
   });
 
-  it("click en usuario lo selecciona; click en Reservar llama onConfirmBook con su id", () => {
+  it("click en usuario lo selecciona; click en Guardar llama onConfirmBook con su id y deltas vacíos", () => {
     const onConfirm = vi.fn();
     mountAdminBookModal({
       doc: doc as unknown as Document,
@@ -218,12 +233,16 @@ describe("admin-book-modal — modo book", () => {
       mode: { kind: "book", users: [meUser, bobUser], meId: 1 },
       onConfirmBook: onConfirm,
     });
-    const bobRow = walk(doc.body).find((e) => e.dataset["userId"] === "2")!;
-    bobRow.click();
+    // El click selector vive en el labelWrap (primer hijo div del row).
+    const bobRow = walk(doc.body).find(
+      (e) => e.tagName === "DIV" && e.dataset["userId"] === "2",
+    )!;
+    const bobLabel = bobRow.children[0]!;
+    bobLabel.click();
 
     const confirm = doc.getElementById("admin-book-modal-confirm")!;
     confirm.click();
-    expect(onConfirm).toHaveBeenCalledWith(2);
+    expect(onConfirm).toHaveBeenCalledWith(2, { create: [], deleteIds: [] });
   });
 
   it("ESC cierra el modal y llama onClose", () => {
@@ -253,6 +272,131 @@ describe("admin-book-modal — modo book", () => {
     const overlay = walk(doc.body).find((e) => e.id === "admin-book-modal-overlay")!;
     overlay.dispatch("click", { stopPropagation: () => {} });
     expect(onClose).toHaveBeenCalled();
+  });
+});
+
+describe("admin-book-modal — modo book con weeklies (change 027)", () => {
+  let doc: FakeDoc;
+
+  beforeEach(() => {
+    doc = makeDoc();
+  });
+
+  afterEach(() => {
+    unmountAdminBookModal();
+  });
+
+  it("renderiza 7 checkboxes (L M X J V S D) por usuario", () => {
+    mountAdminBookModal({
+      doc: doc as unknown as Document,
+      deskLabel: "D5",
+      dateLabel: "hoy",
+      mode: { kind: "book", users: [meUser, bobUser], meId: 1 },
+    });
+    const grid = walk(doc.body).find((e) => e.dataset["dowGridFor"] === "2");
+    expect(grid).toBeDefined();
+    const cells = grid!.children;
+    expect(cells).toHaveLength(7);
+    const labels = cells.map((c) => c.dataset["dow"]);
+    expect(labels).toEqual(["0", "1", "2", "3", "4", "5", "6"]);
+  });
+
+  it("checkboxes precargados marcados según weeklyByUser", () => {
+    mountAdminBookModal({
+      doc: doc as unknown as Document,
+      deskLabel: "D5",
+      dateLabel: "hoy",
+      mode: {
+        kind: "book",
+        users: [meUser, bobUser],
+        meId: 1,
+        weeklyByUser: {
+          "2": [
+            { dow: 0, weeklyId: 100 },
+            { dow: 2, weeklyId: 101 },
+          ],
+        },
+      },
+    });
+    const grid = walk(doc.body).find((e) => e.dataset["dowGridFor"] === "2")!;
+    const checkboxes = walk(grid).filter((e) => e.tagName === "INPUT");
+    // Filtramos por dow del propio checkbox (no del label padre).
+    const checkedDows = checkboxes.filter((cb) => cb.checked).map((cb) => cb.dataset["dow"]);
+    expect(checkedDows.sort()).toEqual(["0", "2"]);
+  });
+
+  it("checkbox conflictivo (otro desk mismo dow) aparece deshabilitado", () => {
+    mountAdminBookModal({
+      doc: doc as unknown as Document,
+      deskLabel: "D5",
+      dateLabel: "hoy",
+      mode: {
+        kind: "book",
+        users: [meUser, bobUser],
+        meId: 1,
+        conflictingDowsByUser: { "2": [3] },
+      },
+    });
+    const grid = walk(doc.body).find((e) => e.dataset["dowGridFor"] === "2")!;
+    const cb3 = walk(grid).find(
+      (e) => e.tagName === "INPUT" && e.dataset["dow"] === "3",
+    )!;
+    expect(cb3.disabled).toBe(true);
+    // Otro dow sin conflicto sí está habilitado
+    const cb0 = walk(grid).find(
+      (e) => e.tagName === "INPUT" && e.dataset["dow"] === "0",
+    )!;
+    expect(cb0.disabled).toBe(false);
+  });
+
+  it("marcar checkbox y guardar produce delta create con (userId, dow)", () => {
+    const onConfirm = vi.fn();
+    mountAdminBookModal({
+      doc: doc as unknown as Document,
+      deskLabel: "D5",
+      dateLabel: "hoy",
+      mode: { kind: "book", users: [meUser, bobUser], meId: 1 },
+      onConfirmBook: onConfirm,
+    });
+    const grid = walk(doc.body).find((e) => e.dataset["dowGridFor"] === "2")!;
+    const cb1 = walk(grid).find(
+      (e) => e.tagName === "INPUT" && e.dataset["dow"] === "1",
+    )!;
+    cb1.checked = true;
+    cb1.dispatch("click", { stopPropagation: () => {} });
+
+    const confirm = doc.getElementById("admin-book-modal-confirm")!;
+    confirm.click();
+    expect(onConfirm).toHaveBeenCalledWith(1, {
+      create: [{ userId: 2, dow: 1 }],
+      deleteIds: [],
+    });
+  });
+
+  it("desmarcar checkbox precargado y guardar produce delta deleteIds", () => {
+    const onConfirm = vi.fn();
+    mountAdminBookModal({
+      doc: doc as unknown as Document,
+      deskLabel: "D5",
+      dateLabel: "hoy",
+      mode: {
+        kind: "book",
+        users: [meUser, bobUser],
+        meId: 1,
+        weeklyByUser: { "2": [{ dow: 0, weeklyId: 999 }] },
+      },
+      onConfirmBook: onConfirm,
+    });
+    const grid = walk(doc.body).find((e) => e.dataset["dowGridFor"] === "2")!;
+    const cb0 = walk(grid).find(
+      (e) => e.tagName === "INPUT" && e.dataset["dow"] === "0",
+    )!;
+    cb0.checked = false;
+    cb0.dispatch("click", { stopPropagation: () => {} });
+
+    const confirm = doc.getElementById("admin-book-modal-confirm")!;
+    confirm.click();
+    expect(onConfirm).toHaveBeenCalledWith(1, { create: [], deleteIds: [999] });
   });
 });
 

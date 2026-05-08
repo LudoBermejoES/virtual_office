@@ -23,15 +23,15 @@
 
 ## 6. UI: extensión del modal admin (change 026)
 
-- [ ] 6.1 Test unit: modal en modo `book` con prop `weeklyByUserId` muestra 7 checkboxes (L M X J V S D) por usuario.
-- [ ] 6.2 Test unit: cambiar checkboxes acumula deltas (creates/deletes) y se aplican al pulsar "Guardar".
-- [ ] 6.3 Test unit: si el usuario ya tiene weekly conflictivo (otro desk mismo dow), el checkbox de ese dow está disabled con tooltip explicativo.
-- [ ] 6.4 Adaptar `frontend/src/ui/admin-book-modal.ts` añadiendo la prop `weeklyByUserId: Record<userId, dow[]>` y la columna de checkboxes.
-- [ ] 6.5 En `OfficeScene.openAdminBookModal`, antes de montar el modal: cargar `GET /api/offices/:id/weekly` y filtrar por `desk_id = current` para precargar el estado de checkboxes.
-- [ ] 6.6 Al pulsar "Guardar": ejecutar deltas (POST/DELETE weeklies) en serie, mostrar feedback en HUD si alguna falla.
+- [x] 6.1 Test unit: modal en modo `book` muestra 7 checkboxes (L M X J V S D) por usuario.
+- [x] 6.2 Test unit: marcar/desmarcar checkboxes y guardar produce `weeklyChanges = { create, deleteIds }` correcto.
+- [x] 6.3 Test unit: dow conflictivo en otro desk → checkbox `disabled` con `title` explicativo.
+- [x] 6.4 [admin-book-modal.ts](frontend/src/ui/admin-book-modal.ts) ampliado con `WeeklyByUser` + `ConflictingDowsByUser` + `WeeklyChanges`. Botón cambia de "Reservar" a "Guardar" para reflejar el alcance combinado. 13 tests modal (5 nuevos del 027).
+- [x] 6.5 `OfficeScene.openAdminBookModal` carga en paralelo `/api/users` y `/api/offices/:id/weekly`, construye `weeklyByUser` (mismo desk) y `conflictingDowsByUser` (otros desks), monta el modal.
+- [x] 6.6 `onConfirmBook` aplica deltas en serie: primero DELETEs, luego POSTs; si alguna falla muestra feedback HUD y se detiene; si hay `userId` además crea reserva diaria con `reserveDeskFor`.
 
 ## 7. Validación final
 
-- [ ] 7.1 `openspec validate --all --strict` en verde.
-- [ ] 7.2 `pnpm typecheck && pnpm lint && pnpm format:check` en verde.
-- [ ] 7.3 `pnpm test` en verde (backend + frontend + tools).
+- [x] 7.1 `openspec validate --all --strict` → 9/9 passed.
+- [x] 7.2 `pnpm typecheck && pnpm lint && pnpm format:check` clean.
+- [x] 7.3 `pnpm test` → 645/645 (backend 393 + frontend 210 + tools 42).
