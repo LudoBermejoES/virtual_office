@@ -795,7 +795,6 @@ El admin panel MUST exponer una pestaña dedicada a gestionar `weekly_assignment
 - **WHEN** el admin pulsa "Limpiar todas"
 - **THEN** confirm + llamadas `DELETE /api/desks/:id/weekly/:weeklyId/exceptions { date }` por cada excepción
 - **AND** el badge desaparece al terminar
-## ADDED Requirements
 
 ### Requirement: Modal admin para gestionar avatar de un usuario
 

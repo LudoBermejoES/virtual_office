@@ -20,6 +20,17 @@ export interface AdminBookModalUser {
   email: string;
   name: string;
   avatar_url: string | null;
+  /**
+   * Placeholder "Bloqueado #N" (change 031): ocupante ficticio que el admin
+   * pone en un puesto para bloquearlo. Se listan al final, bajo un separador.
+   */
+  isPlaceholder?: boolean;
+  /**
+   * Solo para placeholders: ya tiene reserva daily en otro puesto en la fecha
+   * del modal, así que no puede bloquear un segundo puesto ese día (el índice
+   * `idx_bookings_user_date_daily` lo rechazaría con 409).
+   */
+  usedToday?: boolean;
 }
 
 /**
@@ -191,12 +202,18 @@ function renderBookMode(
     conflictingDowsByUser?: ConflictingDowsByUser;
   },
 ): void {
-  // Ordenar usuarios: yo primero, resto alfabético por name (case-insensitive).
-  const me = mode.users.find((u) => u.id === mode.meId);
-  const others = mode.users
+  // Ordenar usuarios: yo primero, resto alfabético por name
+  // (case-insensitive), y los placeholders "Bloqueado #N" al final en su
+  // propio bloque (change 031).
+  const reales = mode.users.filter((u) => !u.isPlaceholder);
+  const placeholders = mode.users
+    .filter((u) => u.isPlaceholder)
+    .sort((a, b) => a.name.localeCompare(b.name, "es"));
+  const me = reales.find((u) => u.id === mode.meId);
+  const others = reales
     .filter((u) => u.id !== mode.meId)
     .sort((a, b) => a.name.toLocaleLowerCase().localeCompare(b.name.toLocaleLowerCase(), "es"));
-  const ordered = me ? [me, ...others] : others;
+  const ordered = [...(me ? [me, ...others] : others), ...placeholders];
 
   let selectedUserId: number | null = me?.id ?? null;
 
@@ -287,14 +304,42 @@ function renderBookMode(
       listEl.appendChild(empty);
       return;
     }
+    // Separador antes del primer placeholder (change 031). Si todos los
+    // placeholders visibles están agotados ese día, lo avisamos aquí.
+    const visiblePlaceholders = filtered.filter((u) => u.isPlaceholder);
+    let separatorRendered = false;
+    const renderSeparator = (): void => {
+      if (separatorRendered) return;
+      separatorRendered = true;
+      const sep = doc.createElement("div");
+      sep.id = "admin-book-modal-placeholder-separator";
+      const agotados =
+        visiblePlaceholders.length > 0 && visiblePlaceholders.every((u) => u.usedToday === true);
+      sep.textContent = agotados
+        ? "BLOQUEAR PUESTO — sin bloqueos libres este día"
+        : "BLOQUEAR PUESTO";
+      Object.assign(sep.style, {
+        padding: "6px 8px",
+        background: "#11132a",
+        color: agotados ? "#e36c36" : "#f5b400",
+        fontSize: "7px",
+        borderTop: "1px solid #444",
+        borderBottom: "1px solid #1a1c30",
+      });
+      listEl.appendChild(sep);
+    };
+
     for (const u of filtered) {
+      if (u.isPlaceholder) renderSeparator();
       const isMe = u.id === mode.meId;
+      const isBlocked = u.isPlaceholder === true && u.usedToday === true;
       const isSelected = u.id === selectedUserId;
       const userDows = currentDowsByUser.get(u.id) ?? new Set<number>();
       const conflictingDows = new Set(conflictingDowsByUser[String(u.id)] ?? []);
 
       const row = doc.createElement("div");
       row.dataset["userId"] = String(u.id);
+      if (isBlocked) row.dataset["disabled"] = "true";
       Object.assign(row.style, {
         padding: "6px 8px",
         background: isSelected ? "#36e36c" : "transparent",
@@ -304,13 +349,17 @@ function renderBookMode(
         display: "flex",
         alignItems: "center",
         gap: "8px",
+        opacity: isBlocked ? "0.4" : "1",
       });
 
       // Bloque nombre + email (clickable para seleccionar usuario)
       const labelWrap = doc.createElement("div");
       labelWrap.style.flex = "1";
-      labelWrap.style.cursor = "pointer";
+      labelWrap.style.cursor = isBlocked ? "not-allowed" : "pointer";
       labelWrap.textContent = isMe ? `${u.name} (yo)` : u.name;
+      if (isBlocked) {
+        labelWrap.title = `${u.name} ya está bloqueando otro puesto este día`;
+      }
       const email = doc.createElement("div");
       email.textContent = u.email;
       Object.assign(email.style, {
@@ -320,6 +369,9 @@ function renderBookMode(
       });
       labelWrap.appendChild(email);
       labelWrap.addEventListener("click", () => {
+        // Un placeholder ya usado ese día no es seleccionable: el backend
+        // devolvería 409 `user_already_booked_today` (change 031).
+        if (isBlocked) return;
         selectedUserId = u.id;
         renderList(filterInput.value);
       });

@@ -233,6 +233,48 @@ CREATE TABLE _migrations (
 
 ---
 
+## Usuarios placeholder "Bloqueado #N"
+
+Sirven para que un admin **bloquee un puesto sin ponerle encima a una persona real**: típicamente gente que aún no ha entrado en la empresa y a la que se le quiere guardar el sitio.
+
+La migración `0010_placeholder_users.sql` siembra tres filas con `is_placeholder = 1`:
+
+| `google_sub` | `email` | `name` |
+|---|---|---|
+| `placeholder:1` | `bloqueado1@teimas.space` | `Bloqueado #1` |
+| `placeholder:2` | `bloqueado2@teimas.space` | `Bloqueado #2` |
+| `placeholder:3` | `bloqueado3@teimas.space` | `Bloqueado #3` |
+
+### Cómo se bloquea un puesto
+
+**No hay endpoints nuevos.** Bloquear es reservar a nombre de un placeholder con los endpoints que ya existen:
+
+| Tipo de bloqueo | Endpoint |
+|---|---|
+| Un día | `POST /api/desks/:id/bookings { date, userId }` |
+| Indefinido | `POST /api/desks/:id/fixed { userId }` |
+| Semanal | `POST /api/desks/:id/weekly { userId, dow }` |
+| Saltar un día del semanal | `POST /api/desks/:id/weekly/:weeklyId/exceptions { date }` |
+
+En el mapa se renderiza como cualquier puesto ocupado por otra persona; se distingue por el nombre del ocupante, no por un estado visual propio.
+
+### Límite: tres bloqueos simultáneos por día
+
+Son tres filas de `users` **ordinarias**, así que respetan las mismas reglas de unicidad que una persona (`idx_bookings_user_date_daily`, `weekly_assignments UNIQUE(user_id, dow)`, `fixed_assignments UNIQUE(user_id)`). De ahí el límite: un cuarto bloqueo el mismo día devuelve `409 user_already_booked_today`.
+
+Fue una decisión deliberada. Un único placeholder multi-puesto habría exigido relajar esos tres índices, y como los índices parciales de SQLite no admiten subconsultas, la garantía se habría movido de la DB al código de aplicación **para todos los usuarios, reales incluidos**. Si algún día hacen falta más de tres, lo barato es subir el número de filas sembradas, no relajar los índices.
+
+### Restricciones
+
+- **No pueden iniciar sesión.** Tres salvaguardas: `google_sub` sintético (un `sub` de Google es numérico y nunca colisiona), dominio `teimas.space` fuera de `TEIMAS_DOMAINS`, y rechazo explícito `403 placeholder_cannot_login`.
+- **No se gestionan como personas.** `PATCH /api/users/:id` → `409 cannot_modify_placeholder`; `POST /api/invitations` con su email → `422 cannot_invite_placeholder`.
+- **Sí admiten avatar custom**, que es justo el mecanismo para darles icono propio en el mapa.
+- **Visibilidad selectiva.** `GET /api/users` los excluye por defecto; hay que pedirlos con `?includePlaceholders=1` (lo hacen el modal de reserva, la pestaña FIJOS y la pestaña USUARIOS).
+- **`?date=YYYY-MM-DD`.** Anota cada elemento con `has_daily_booking` (`0`/`1`): si ese usuario ya tiene una reserva `daily` esa fecha en **cualquier** oficina. El modal de reserva del admin lo usa para deshabilitar a los placeholders agotados sin esperar al 409. El cálculo ignora `fixed` y `weekly` porque el índice único es parcial (`WHERE type='daily'`) y global (`user_id`, `date`) — mirar solo la oficina activa dejaba pasar el error.
+- Cualquier informe de ocupación que se añada en el futuro debe filtrar `is_placeholder = 1`.
+
+---
+
 ## Invitaciones a externos
 
 ```

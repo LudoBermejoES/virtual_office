@@ -6,6 +6,35 @@ import { mountAdminAvatarModal } from "./admin-avatar-modal.js";
 const TABS = ["OFICINAS", "USUARIOS", "FIJOS", "RECURRENCIAS"] as const;
 type Tab = (typeof TABS)[number];
 
+/** Fila de usuario tal como la devuelve `GET /api/users`. */
+export interface AdminPanelUser {
+  id: number;
+  name: string;
+  email: string;
+  role: string;
+  avatar_url: string | null;
+  avatar_locked: number;
+  /** 1 en los placeholders "Bloqueado #N" (change 031). */
+  is_placeholder?: number;
+}
+
+/**
+ * Separa personas de placeholders "Bloqueado #N" (change 031) para que la
+ * pestaña USUARIOS los muestre en secciones distintas: los placeholders no se
+ * promueven ni se degradan, así que no llevan botones de rol.
+ */
+export function partitionUsers<T extends { is_placeholder?: number }>(
+  users: readonly T[],
+): { people: T[]; placeholders: T[] } {
+  const people: T[] = [];
+  const placeholders: T[] = [];
+  for (const u of users) {
+    if (u.is_placeholder === 1) placeholders.push(u);
+    else people.push(u);
+  }
+  return { people, placeholders };
+}
+
 let panelEl: HTMLDivElement | null = null;
 let editDesksCallback: ((officeId: number) => void) | null = null;
 let editSpritesCallback: ((officeId: number) => void) | null = null;
@@ -576,21 +605,18 @@ function renderUsuarios(container: HTMLElement): void {
   container.innerHTML = '<p style="color:#8e92a8;font-size:10px">Cargando usuarios…</p>';
 
   Promise.all([
-    fetch(`${BASE_URL}/api/users`, { credentials: "include" }).then((r) => r.json()),
+    // Incluimos los placeholders para listarlos en su propia sección
+    // "PUESTOS BLOQUEADOS" (change 031).
+    fetch(`${BASE_URL}/api/users?includePlaceholders=1`, { credentials: "include" }).then((r) =>
+      r.json(),
+    ),
     fetch(`${BASE_URL}/api/invitations?include=all`, { credentials: "include" }).then((r) =>
       r.json(),
     ),
   ])
     .then(
       ([users, invitations]: [
-        {
-          id: number;
-          name: string;
-          email: string;
-          role: string;
-          avatar_url: string | null;
-          avatar_locked: number;
-        }[],
+        AdminPanelUser[],
         {
           id: number;
           email: string;
@@ -601,14 +627,35 @@ function renderUsuarios(container: HTMLElement): void {
       ]) => {
         container.innerHTML = "";
 
+        const { people, placeholders } = partitionUsers(users);
+
         // Users section
         const userTitle = document.createElement("p");
         userTitle.textContent = "USUARIOS";
         Object.assign(userTitle.style, { color: "#36e36c", fontSize: "10px", marginBottom: "8px" });
         container.appendChild(userTitle);
 
-        for (const u of users) {
+        for (const u of people) {
           container.appendChild(buildUserRow(u, () => renderUsuarios(container)));
+        }
+
+        // Placeholders "Bloqueado #N" (change 031): sección aparte y sin
+        // acciones de rol, para que no se confundan con personas.
+        if (placeholders.length > 0) {
+          const phTitle = document.createElement("p");
+          phTitle.textContent = "PUESTOS BLOQUEADOS";
+          Object.assign(phTitle.style, {
+            color: "#f5b400",
+            fontSize: "10px",
+            margin: "16px 0 8px",
+          });
+          container.appendChild(phTitle);
+
+          for (const u of placeholders) {
+            container.appendChild(
+              buildUserRow(u, () => renderUsuarios(container), { allowRoleChange: false }),
+            );
+          }
         }
 
         // Invitations section
@@ -630,16 +677,13 @@ function renderUsuarios(container: HTMLElement): void {
 }
 
 function buildUserRow(
-  user: {
-    id: number;
-    name: string;
-    email: string;
-    role: string;
-    avatar_url: string | null;
-    avatar_locked: number;
-  },
+  user: AdminPanelUser,
   onChanged: () => void,
+  opts: { allowRoleChange?: boolean } = {},
 ): HTMLElement {
+  // Los placeholders "Bloqueado #N" no se promueven ni se degradan
+  // (change 031); sí admiten avatar custom, que es su icono en el mapa.
+  const allowRoleChange = opts.allowRoleChange !== false;
   const row = document.createElement("div");
   Object.assign(row.style, {
     display: "flex",
@@ -682,6 +726,8 @@ function buildUserRow(
     });
   });
   row.appendChild(avatarBtn);
+
+  if (!allowRoleChange) return row;
 
   const isAdmin = user.role === "admin";
   const toggleBtn = document.createElement("button");
@@ -867,9 +913,11 @@ function renderFijos(container: HTMLElement, preselectedDeskId?: number): void {
     fetch(`${BASE_URL}/api/offices`, { credentials: "include" }).then((r) => r.json()) as Promise<
       { id: number; name: string }[]
     >,
-    fetch(`${BASE_URL}/api/users`, { credentials: "include" }).then((r) => r.json()) as Promise<
-      UserRow[]
-    >,
+    // Con placeholders: un puesto se puede dejar bloqueado indefinidamente
+    // asignando un "Bloqueado #N" como fijo (change 031).
+    fetch(`${BASE_URL}/api/users?includePlaceholders=1`, { credentials: "include" }).then((r) =>
+      r.json(),
+    ) as Promise<UserRow[]>,
   ])
     .then(([offices, users]) => {
       container.innerHTML = "";

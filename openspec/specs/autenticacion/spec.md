@@ -152,7 +152,6 @@ El sistema NUNCA MUST registrar el endpoint `POST /api/test/session` cuando `NOD
 - GIVEN el servidor arrancado con `TEST_AUTH=off`
 - WHEN se hace `POST /api/test/session`
 - THEN la respuesta es 404 (la ruta no está registrada)
-## ADDED Requirements
 
 ### Requirement: Avatar custom subido por admin
 

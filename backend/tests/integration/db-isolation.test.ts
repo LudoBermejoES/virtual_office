@@ -14,8 +14,12 @@ describe("aislamiento de setupTestDb", () => {
     a.cleanup();
 
     const b = setupTestDb();
-    const rows = b.db.prepare("SELECT * FROM users").all();
-    expect(rows).toHaveLength(0);
+    // Una DB nueva solo trae los placeholders sembrados por la migración 0010
+    // (change 031); el usuario insertado en `a` no se filtra.
+    const reales = b.db.prepare("SELECT * FROM users WHERE is_placeholder = 0").all();
+    expect(reales).toHaveLength(0);
+    const leaked = b.db.prepare("SELECT * FROM users WHERE google_sub = 'sub-a'").all();
+    expect(leaked).toHaveLength(0);
     b.cleanup();
   });
 });

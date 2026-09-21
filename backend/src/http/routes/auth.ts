@@ -5,7 +5,13 @@ import { checkDomain } from "../../domain/auth.js";
 import * as invRepo from "../../infra/repos/invitations.js";
 import type { GoogleVerifier } from "../../infra/auth/google-verifier.js";
 import { signJwt, verifyJwt } from "../../infra/auth/session.js";
-import { upsertUser, promoteToAdmin, findUserById } from "../../infra/repos/users.js";
+import {
+  upsertUser,
+  promoteToAdmin,
+  findUserById,
+  findUserByEmail,
+  isPlaceholder,
+} from "../../infra/repos/users.js";
 import * as officesRepo from "../../infra/repos/offices.js";
 import { logger } from "../../config/logger.js";
 import type { Env } from "../../config/env.js";
@@ -77,6 +83,19 @@ export async function authRoutes(
             ? "domain_not_allowed"
             : domainCheck.reason;
         return reply.status(status).send({ reason: responseReason });
+      }
+
+      // Los placeholders "Bloqueado #N" (change 031) no son personas: nunca
+      // pueden abrir sesión. El `google_sub` sintético y el dominio fuera de
+      // TEIMAS_DOMAINS ya lo impiden, pero comprobamos explícitamente para
+      // que siga protegido si algún día cambian los dominios permitidos.
+      const existingByEmail = findUserByEmail(db, payload.email);
+      if (existingByEmail && isPlaceholder(existingByEmail)) {
+        logger.warn("auth.rejected", {
+          reason: "placeholder_cannot_login",
+          domain: existingByEmail.domain,
+        });
+        return reply.status(403).send({ reason: "placeholder_cannot_login" });
       }
 
       const isInvited = domainCheck.reason === "invited";

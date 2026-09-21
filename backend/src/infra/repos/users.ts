@@ -13,6 +13,18 @@ export interface UserRow {
   created_at: string;
   /** Cuando es 1, el upsert de Google login NO machaca `avatar_url` (change 030). */
   avatar_locked: number;
+  /**
+   * Cuando es 1, la fila es un placeholder "Bloqueado #N" (change 031): un
+   * ocupante ficticio que un admin pone en un puesto para bloquearlo sin
+   * usar a una persona real. No puede iniciar sesión ni ser gestionado como
+   * usuario (rol, invitaciones).
+   */
+  is_placeholder: number;
+}
+
+/** Un placeholder "Bloqueado #N" (change 031), no una persona real. */
+export function isPlaceholder(user: Pick<UserRow, "is_placeholder">): boolean {
+  return user.is_placeholder === 1;
 }
 
 export function setAvatarLocked(
@@ -76,8 +88,24 @@ export function findUserById(db: DatabaseSync, id: number): UserRow | null {
   );
 }
 
-export function listUsers(db: DatabaseSync): UserRow[] {
-  return db.prepare("SELECT * FROM users ORDER BY created_at ASC").all() as unknown as UserRow[];
+/**
+ * Lista usuarios. Por defecto excluye los placeholders "Bloqueado #N"
+ * (change 031) para que no se mezclen con personas en la pestaña USUARIOS.
+ * Con `includePlaceholders` van incluidos y ordenados al final, que es lo que
+ * necesitan el modal de reserva del admin y la pestaña FIJOS.
+ */
+export function listUsers(
+  db: DatabaseSync,
+  opts: { includePlaceholders?: boolean } = {},
+): UserRow[] {
+  if (!opts.includePlaceholders) {
+    return db
+      .prepare("SELECT * FROM users WHERE is_placeholder = 0 ORDER BY created_at ASC, id ASC")
+      .all() as unknown as UserRow[];
+  }
+  return db
+    .prepare("SELECT * FROM users ORDER BY is_placeholder ASC, created_at ASC, id ASC")
+    .all() as unknown as UserRow[];
 }
 
 export function findUserByEmail(db: DatabaseSync, email: string): UserRow | null {

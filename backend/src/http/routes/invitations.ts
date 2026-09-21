@@ -3,6 +3,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { z } from "zod";
 import { generateInviteToken } from "../../domain/invitations.js";
 import * as invRepo from "../../infra/repos/invitations.js";
+import { findUserByEmail, isPlaceholder } from "../../infra/repos/users.js";
 import { logger } from "../../config/logger.js";
 import type { Env } from "../../config/env.js";
 
@@ -20,6 +21,13 @@ export async function invitationsRoutes(
     const domain = email.split("@")[1] ?? "";
     if (teimasDomains.includes(domain)) {
       return reply.status(422).send({ reason: "internal_domain" });
+    }
+
+    // Los placeholders "Bloqueado #N" no son personas invitables (change 031).
+    // Va antes del 409 `already_user` para dar un motivo específico.
+    const placeholder = findUserByEmail(db, email);
+    if (placeholder && isPlaceholder(placeholder)) {
+      return reply.status(422).send({ reason: "cannot_invite_placeholder" });
     }
 
     const existingUser = db.prepare("SELECT id FROM users WHERE email = ?").get(email) as

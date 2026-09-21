@@ -95,3 +95,17 @@ export function findUserBookingOnDate(
       .get(userId, date, type) as unknown as BookingRow | undefined) ?? null
   );
 }
+
+/**
+ * Ids de los usuarios con una reserva `daily` en esa fecha, en CUALQUIER
+ * oficina. El índice único de daily es `(user_id, date)` global y parcial
+ * (`WHERE type='daily'`), así que quien quiera anticipar un 409
+ * `user_already_booked_today` tiene que mirar más allá de la oficina activa y
+ * no contar los fijos (change 031).
+ */
+export function listDailyBookedUserIds(db: DatabaseSync, date: string): number[] {
+  const rows = db
+    .prepare("SELECT DISTINCT user_id FROM bookings WHERE date = ? AND type = 'daily'")
+    .all(date) as unknown as Array<{ user_id: number }>;
+  return rows.map((r) => r.user_id);
+}

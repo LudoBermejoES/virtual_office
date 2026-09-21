@@ -589,7 +589,14 @@ export class OfficeScene extends Phaser.Scene {
     }> = [];
     try {
       const [usersRes, weeklyRes] = await Promise.all([
-        fetch(`${BASE_URL}/api/users`, { credentials: "include" }),
+        // `includePlaceholders=1` trae los "Bloqueado #N" (change 031), que el
+        // admin usa para bloquear un puesto sin poner a una persona real.
+        // `date` hace que el backend anote `has_daily_booking` mirando TODAS
+        // las oficinas y solo las reservas daily, que es el alcance real del
+        // índice único que provoca el 409.
+        fetch(`${BASE_URL}/api/users?includePlaceholders=1&date=${dateIso}`, {
+          credentials: "include",
+        }),
         fetch(`${BASE_URL}/api/offices/${this.detail.office.id}/weekly`, {
           credentials: "include",
         }),
@@ -598,7 +605,25 @@ export class OfficeScene extends Phaser.Scene {
         this.showFeedback(`Error cargando usuarios: ${usersRes.status}`);
         return;
       }
-      users = (await usersRes.json()) as AdminBookModalUser[];
+      const rawUsers = (await usersRes.json()) as Array<
+        AdminBookModalUser & { is_placeholder?: number; has_daily_booking?: number }
+      >;
+      // Un placeholder ya reservado ese día no puede bloquear un segundo
+      // puesto (índice único user+date para daily): lo marcamos para que el
+      // modal lo deshabilite en lugar de dejar que el POST falle con 409.
+      // `has_daily_booking` lo calcula el backend: el snapshot local solo
+      // conoce esta oficina, y la unicidad diaria es global.
+      users = rawUsers.map((u) => {
+        const isPlaceholder = u.is_placeholder === 1;
+        return {
+          id: u.id,
+          email: u.email,
+          name: u.name,
+          avatar_url: u.avatar_url,
+          isPlaceholder,
+          usedToday: isPlaceholder && u.has_daily_booking === 1,
+        };
+      });
       // weeklyRes puede fallar 403 si caller no es admin — improbable aquí
       // pero no bloqueante. Tratamos como lista vacía.
       if (weeklyRes.ok) {
